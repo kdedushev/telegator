@@ -930,6 +930,7 @@ private:
 		bool small = false;
 	} _botMenu;
 	object_ptr<Ui::IconButton> _attachToggle;
+	object_ptr<Ui::RoundButton> _testButton; // TEST-BUTTON-POC
 	object_ptr<Ui::IconButton> _replaceMedia = { nullptr };
 	object_ptr<Ui::SendAsButton> _sendAs = { nullptr };
 	object_ptr<Ui::EmojiButton> _tabbedSelectorToggle;
