@@ -345,7 +345,7 @@ bool checkInstalled(QString path = {}) {
 		}
 	}
 
-	const auto installed = u"Telegram Desktop/Telegram.lnk"_q;
+	const auto installed = u"Telegator/Telegator.lnk"_q; // Telegator
 	const auto old = u"Telegram Win (Unofficial)/Telegram.lnk"_q;
 	return validateShortcutAt(path + installed)
 		|| validateShortcutAt(path + old);

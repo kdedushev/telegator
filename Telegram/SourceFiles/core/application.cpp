@@ -481,6 +481,7 @@ void Application::run() {
 }
 
 void Application::autoRegisterUrlScheme() {
+	return; // Telegator: tg: links stay with the official client.
 	if (!OptionSkipUrlSchemeRegister.value()) {
 		InvokeQueued(this, [] { RegisterUrlScheme(); });
 	}
