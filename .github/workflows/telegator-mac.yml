@@ -95,9 +95,9 @@ jobs:
         run: |
           cd $REPO_NAME/out/Debug
           mkdir artifact
-          cp -a Telegram.app artifact/
+          cp -a Telegator.app artifact/
           cd artifact
-          zip -qry ../Telegator-macos.zip Telegram.app
+          zip -qry ../Telegator-macos.zip Telegator.app
 
       - uses: actions/upload-artifact@v7
         if: env.ONLY_CACHE == 'false'

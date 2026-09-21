@@ -2390,12 +2390,12 @@ if (build_macstore)
     )
 else()
     if (CMAKE_GENERATOR STREQUAL Xcode)
-        set(bundle_identifier "com.tdesktop.Telegram$<$<CONFIG:Debug>:Debug>")
+        set(bundle_identifier "io.github.kdedushev.telegator$<$<CONFIG:Debug>:Debug>") # Telegator
     else()
-        set(bundle_identifier "com.tdesktop.Telegram")
+        set(bundle_identifier "io.github.kdedushev.telegator") # Telegator
     endif()
     set(bundle_entitlements "Telegram.entitlements")
-    set(output_name "Telegram")
+    set(output_name "Telegator") # Telegator
 endif()
 
 if (CMAKE_GENERATOR STREQUAL Xcode)
