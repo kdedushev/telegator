@@ -2221,6 +2221,8 @@ if (DESKTOP_APP_USE_PACKAGED)
     )
 endif()
 
+include(cmake/telegator.cmake) # Telegator
+
 nice_target_sources(Telegram ${res_loc}
 PRIVATE
     qrc/emoji_1.qrc

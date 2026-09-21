@@ -25,6 +25,10 @@ enum class SendMediaType;
 class MessageLinksParser;
 struct InlineBotQuery;
 
+namespace Telegator { // Telegator
+class ComposeButtons;
+} // namespace Telegator
+
 namespace MTP {
 class Error;
 } // namespace MTP
@@ -930,7 +934,7 @@ private:
 		bool small = false;
 	} _botMenu;
 	object_ptr<Ui::IconButton> _attachToggle;
-	object_ptr<Ui::RoundButton> _testButton; // TEST-BUTTON-POC
+	std::unique_ptr<Telegator::ComposeButtons> _telegator; // Telegator
 	object_ptr<Ui::IconButton> _replaceMedia = { nullptr };
 	object_ptr<Ui::SendAsButton> _sendAs = { nullptr };
 	object_ptr<Ui::EmojiButton> _tabbedSelectorToggle;

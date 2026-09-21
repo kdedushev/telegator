@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history_widget.h"
+#include "telegator/telegator_compose_buttons.h" // Telegator
 
 #include "api/api_compose_with_ai.h"
 #include "api/api_editing.h"
@@ -318,7 +319,15 @@ HistoryWidget::HistoryWidget(
 	st::historyComposeButton)
 , _reportMessages(this, QString(), st::historyComposeButton)
 , _attachToggle(this, st::historyAttach)
-, _testButton(this, rpl::single(u"TEST"_q), st::historyBotMenuButton) // TEST-BUTTON-POC
+, _telegator(std::make_unique<Telegator::ComposeButtons>( // Telegator
+	this,
+	_attachToggle->shownValue(),
+	[=](const QString &text) {
+		if (_history && !_editMsgId) {
+			_field->setTextWithTags({ text, {} });
+			send({});
+		}
+	}))
 , _tabbedSelectorToggle(this, st::historyAttachEmoji)
 , _botKeyboardShow(this, st::historyBotKeyboardShow)
 , _botKeyboardHide(this, st::historyBotKeyboardHide)
@@ -677,20 +686,6 @@ HistoryWidget::HistoryWidget(
 	_botKeyboardShow->addClickHandler([=] { toggleKeyboard(); });
 	_botKeyboardHide->addClickHandler([=] { toggleKeyboard(); });
 	_botCommandStart->addClickHandler([=] { startBotCommand(); });
-
-	// TEST-BUTTON-POC {
-	_testButton->setFullRadius(true);
-	_testButton->setClickedCallback([=] {
-		if (!_history || _editMsgId) {
-			return;
-		}
-		_field->setTextWithTags({ u"Тестовая заготовка"_q, {} });
-		send({});
-	});
-	_attachToggle->shownValue() | rpl::on_next([=](bool shown) {
-		_testButton->setVisible(shown);
-	}, _testButton->lifetime());
-	// } TEST-BUTTON-POC
 
 	_topShadow->hide();
 
@@ -7429,11 +7424,7 @@ void HistoryWidget::moveFieldControls() {
 		_botMenu.button->moveToLeft(left + skip, buttonsBottom + skip);
 		left += skip + _botMenu.button->width();
 	}
-	if (!_attachToggle->isHidden()) { // TEST-BUTTON-POC
-		const auto skip = st::historyBotMenuSkip;
-		_testButton->moveToLeft(left + skip, buttonsBottom + skip);
-		left += skip + _testButton->width();
-	}
+	left = _telegator->moveToLeft(left, buttonsBottom); // Telegator
 	if (_replaceMedia) {
 		_replaceMedia->moveToLeft(left, buttonsBottom);
 	}
@@ -7526,9 +7517,7 @@ void HistoryWidget::updateFieldSize() {
 	if (_botMenu.button) {
 		fieldWidth -= st::historyBotMenuSkip + _botMenu.button->width();
 	}
-	if (!_attachToggle->isHidden()) { // TEST-BUTTON-POC
-		fieldWidth -= st::historyBotMenuSkip + _testButton->width();
-	}
+	fieldWidth -= _telegator->width(); // Telegator
 	if (_sendAs) {
 		fieldWidth -= _sendAs->width();
 	}
