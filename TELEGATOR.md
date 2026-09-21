@@ -58,12 +58,14 @@ gh workflow run "Telegator macOS" --repo kdedushev/telegator --ref main -f only_
 
 ## Запуск собранного клиента на Mac владельца
 
-**Только с отдельной папкой данных**, пока приложение не переименовано:
-у владельца установлен обычный Telegram Desktop с тем же bundle id, и без
-`-workdir` форк откроет его рабочую сессию.
+Клиент называется Telegator (bundle id `io.github.kdedushev.telegator`,
+данные — `~/Library/Application Support/Telegator/`) и ставится рядом с
+Telegram Desktop, не трогая его сессию. Тестовые сборки всё равно запускай
+с папкой данных внутри сборки — чтобы не задеть рабочий Telegator и удалять
+сборку целиком:
 
 ```bash
-open -n builds/<папка>/Telegram.app --args -workdir ~/Projects/telegator/builds/<папка>/workdir/
+open -n builds/<папка>/Telegator.app --args -workdir ~/Projects/telegator/builds/<папка>/workdir/
 ```
 
 Для ручной проверки сообщений — чат «Избранное», не живые собеседники.
@@ -94,7 +96,7 @@ git rebase <новый тег или upstream/dev>
   прямо это запрещает — даже если так делает чужой форк).
 - Выполнять рабочие действия в клиенте: кнопка сообщает серверу владельца
   «нажали X в чате Y», решает и исполняет сервер.
-- Запускать собранный клиент без `-workdir` (см. выше).
+- Запускать тестовую сборку без `-workdir` (см. выше).
 
 ## Гигиена — чтобы не копился мусор
 
