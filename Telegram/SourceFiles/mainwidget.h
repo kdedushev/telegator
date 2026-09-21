@@ -15,6 +15,10 @@ class HistoryWidget;
 class StackItem;
 class Image;
 
+namespace Telegator { // Telegator
+class SidePanel;
+} // namespace Telegator
+
 namespace Bot {
 struct SendCommandRequest;
 } // namespace Bot
@@ -356,6 +360,7 @@ private:
 
 	const base::unique_qptr<Ui::PlainShadow> _sideShadow;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
+	std::unique_ptr<Telegator::SidePanel> _telegatorPanel; // Telegator
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };
 	object_ptr<Ui::ResizeArea> _thirdColumnResizeArea = { nullptr };
 

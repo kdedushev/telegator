@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_top_bar_widget.h"
+#include "telegator/telegator_panel.h" // Telegator
 
 #include "history/history.h"
 #include "history/view/history_view_send_action.h"
@@ -127,6 +128,7 @@ TopBarWidget::TopBarWidget(
 , _groupCall(this, st::topBarGroupCall)
 , _search(this, st::topBarSearch)
 , _infoToggle(this, st::topBarInfo)
+, _telegatorToggle(std::make_unique<Telegator::PanelToggle>(this, controller)) // Telegator
 , _menuToggle(this, st::topBarMenuToggle)
 , _titlePeerText(st::windowMinWidth / 3)
 , _onlineUpdater([=] { updateOnlineDisplay(); }) {
@@ -1271,6 +1273,7 @@ void TopBarWidget::updateControlsGeometry() {
 		_infoToggle->moveToRight(_rightTaken, otherButtonsTop);
 		_rightTaken += _infoToggle->width();
 	}
+	_rightTaken = _telegatorToggle->moveToRight(_rightTaken, otherButtonsTop); // Telegator
 	if (!_call->isHidden() || !_groupCall->isHidden()) {
 		_call->moveToRight(_rightTaken, otherButtonsTop);
 		_groupCall->moveToRight(_rightTaken, otherButtonsTop);
@@ -1389,6 +1392,7 @@ void TopBarWidget::updateControlsVisibility() {
 		&& !isOneColumn
 		&& _controller->canShowThirdSection()
 		&& !_chooseForReportReason);
+	_telegatorToggle->setAvailable(hasInfo && !isOneColumn); // Telegator
 	const auto callsEnabled = [&] {
 		if (const auto peer = _activeChat.key.peer()) {
 			if (const auto user = peer->asUser()) {

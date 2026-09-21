@@ -6,6 +6,7 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "mainwidget.h"
+#include "telegator/telegator_panel.h" // Telegator
 
 #include "api/api_updates.h"
 #include "api/api_views.h"
@@ -285,6 +286,15 @@ MainWidget::MainWidget(
 	: nullptr)
 , _playerPlaylist(this, _controller)
 , _changelogs(Core::Changelogs::Create(&controller->session())) {
+	_telegatorPanel = std::make_unique<Telegator::SidePanel>( // Telegator
+		this,
+		_controller,
+		[=](const QString &text) {
+			if (!_mainSection) {
+				_history->insertTextAtCursor(text);
+			}
+		},
+		[=] { updateControlsGeometry(); });
 	if (_dialogs) {
 		setupConnectingWidget();
 	}
@@ -2763,6 +2773,11 @@ void MainWidget::updateControlsGeometry() {
 				width() - st::columnMinimalWidthMain);
 			_dialogs->setGeometryToLeft(0, 0, dialogsWidth, height());
 		}
+		thirdSectionWidth += _telegatorPanel->layout(QRect( // Telegator
+			dialogsWidth,
+			getThirdSectionTop(),
+			width() - dialogsWidth - thirdSectionWidth,
+			height() - getThirdSectionTop()));
 		if (_sideShadow) {
 			_sideShadow->setGeometryToLeft(
 				dialogsWidth,

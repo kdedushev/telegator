@@ -16,6 +16,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_report.h"
 #include "dialogs/dialogs_key.h"
 
+namespace Telegator { // Telegator
+class PanelToggle;
+} // namespace Telegator
+
 namespace style {
 struct UserpicButton;
 } // namespace style
@@ -256,6 +260,7 @@ private:
 	object_ptr<Ui::IconButton> _groupCall;
 	object_ptr<Ui::IconButton> _search;
 	object_ptr<Ui::IconButton> _infoToggle;
+	std::unique_ptr<Telegator::PanelToggle> _telegatorToggle; // Telegator
 	object_ptr<Ui::IconButton> _menuToggle;
 	base::unique_qptr<Ui::PopupMenu> _menu;
 	base::weak_qptr<Ui::IconButton> _menuButton;
