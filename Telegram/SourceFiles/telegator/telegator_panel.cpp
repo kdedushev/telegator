@@ -99,7 +99,9 @@ document.addEventListener('DOMContentLoaded', function () {
 	return uR"HTML(<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>
-body { font-family: -apple-system, 'Segoe UI', sans-serif; margin: 16px; }
+body { font-family: -apple-system, 'Segoe UI', sans-serif; margin: 0;
+	padding: 16px; min-height: 100vh; box-sizing: border-box;
+	background: #ffffff; color: #111111; }
 pre { white-space: pre-wrap; background: rgba(127,127,127,.12);
 	padding: 8px; border-radius: 6px; }
 button { padding: 8px 12px; border-radius: 6px; }
@@ -205,8 +207,12 @@ SidePanel::SidePanel(
 	}, _body->lifetime());
 
 	Shown(controller).changes() | rpl::on_next([=](bool shown) {
-		if (shown && !_webview) {
-			createWebview();
+		if (shown) {
+			// The panel takes the place of the profile column.
+			controller->closeThirdSection();
+			if (!_webview) {
+				createWebview();
+			}
 		}
 		relayout();
 	}, _body->lifetime());
@@ -257,6 +263,7 @@ void SidePanel::createWebview() {
 		});
 	const auto raw = _webview.get();
 	if (!raw->widget()) {
+		LOG(("Telegator: panel webview is not available."));
 		_webview = nullptr;
 		const auto label = Ui::CreateChild<Ui::FlatLabel>(
 			_body.get(),
@@ -278,6 +285,8 @@ void SidePanel::createWebview() {
 		return allowedNavigation(uri);
 	});
 	raw->setNavigationDoneHandler([=](bool success) {
+		LOG(("Telegator: panel page %1."
+			).arg(success ? "loaded" : "failed to load"));
 		if (success) {
 			_pageReady = true;
 			sendChat();
