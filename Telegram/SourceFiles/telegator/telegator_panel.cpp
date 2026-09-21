@@ -13,9 +13,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "main/main_session.h"
 #include "settings.h"
 #include "telegator/telegator_config.h"
+#include "ui/effects/ripple_animation.h"
 #include "ui/rp_widget.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
+#include "webview/webview_data_stream_memory.h"
 #include "webview/webview_embed.h"
 #include "webview/webview_interface.h"
 #include "window/window_session_controller.h"
@@ -154,20 +156,72 @@ if (Telegator.chat) Telegator.onchat(Telegator.chat);
 
 } // namespace
 
+// Looks like the other chat top bar buttons (st::topBarInfo).
+class PanelToggle::Button final : public Ui::RippleButton {
+public:
+	explicit Button(QWidget *parent)
+	: RippleButton(parent, st::topBarInfo.ripple) {
+		resize(st::topBarInfo.width, st::topBarInfo.height);
+		setCursor(style::cur_pointer);
+	}
+
+	void setActive(bool active) {
+		_active = active;
+		update();
+	}
+
+private:
+	void paintEvent(QPaintEvent *e) override {
+		auto p = QPainter(this);
+		const auto &st = st::topBarInfo;
+		paintRipple(p, st.rippleAreaPosition);
+		const auto &icon = st::menuIconManage;
+		const auto center = st.iconPosition
+			+ QPoint(st.icon.width() / 2, st.icon.height() / 2);
+		const auto color = _active
+			? st::windowActiveTextFg
+			: isOver()
+			? st::menuIconFgOver
+			: st::menuIconFg;
+		icon.paint(
+			p,
+			center - QPoint(icon.width() / 2, icon.height() / 2),
+			width(),
+			color->c);
+	}
+
+	void onStateChanged(State was, StateChangeSource source) override {
+		RippleButton::onStateChanged(was, source);
+		update();
+	}
+
+	QImage prepareRippleMask() const override {
+		const auto size = st::topBarInfo.rippleAreaSize;
+		return Ui::RippleAnimation::EllipseMask(QSize(size, size));
+	}
+
+	QPoint prepareRippleStartPosition() const override {
+		return mapFromGlobal(QCursor::pos())
+			- st::topBarInfo.rippleAreaPosition;
+	}
+
+	bool _active = false;
+
+};
+
 PanelToggle::PanelToggle(
 	not_null<QWidget*> parent,
 	not_null<Window::SessionController*> controller) {
 	if (!PanelAllowed(&controller->session())) {
 		return;
 	}
-	_button.create(parent, st::topBarInfo);
-	_button->setIconOverride(&st::menuIconManage, &st::menuIconManage);
+	_button.create(parent);
 	_button->setClickedCallback([=] {
 		auto &shown = Shown(controller);
 		shown = !shown.current();
 	});
 	Shown(controller).value() | rpl::on_next([=](bool shown) {
-		_button->setForceRippled(shown);
+		_button->setActive(shown);
 	}, _button->lifetime());
 }
 
@@ -297,18 +351,31 @@ void SidePanel::createWebview() {
 			handleMessage(message);
 		});
 	});
+	raw->setDataRequestHandler([=](Webview::DataRequest request) {
+		if (!request.id.starts_with("telegator/demo.html")) {
+			return Webview::DataResult::Failed;
+		}
+		request.done({
+			.stream = std::make_unique<Webview::DataStreamFromMemory>(
+				DemoPage().toUtf8(),
+				"text/html; charset=utf-8"),
+		});
+		return Webview::DataResult::Done;
+	});
 	raw->init(BridgeScript());
 	if (const auto url = Panel().url; !url.isEmpty()) {
 		raw->navigate(url);
 	} else {
-		raw->loadHtml(DemoPage(), u"about:blank"_q);
+		raw->navigateToData(u"telegator/demo.html"_q);
 	}
 }
 
 bool SidePanel::allowedNavigation(const QString &uri) const {
 	const auto url = Panel().url;
 	if (url.isEmpty()) {
-		return uri.startsWith(u"about:"_q);
+		// Demo page is served by lib_webview's data domain (mac, windows).
+		return uri.startsWith(u"desktopappresource://"_q)
+			|| uri.startsWith(u"http://desktop-app-resource/"_q);
 	}
 	const auto target = QUrl(uri);
 	const auto base = QUrl(url);

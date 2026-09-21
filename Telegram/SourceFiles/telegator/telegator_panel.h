@@ -15,7 +15,6 @@ class HistoryWidget;
 
 namespace Ui {
 class RpWidget;
-class IconButton;
 } // namespace Ui
 
 namespace Webview {
@@ -42,7 +41,9 @@ public:
 	[[nodiscard]] int moveToRight(int right, int top);
 
 private:
-	object_ptr<Ui::IconButton> _button = { nullptr };
+	class Button;
+
+	object_ptr<Button> _button = { nullptr };
 
 };
 
