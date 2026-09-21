@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/file_utilities.h"
 #include "data/data_peer.h"
 #include "dialogs/dialogs_key.h"
+#include "history/history_widget.h"
 #include "main/main_session.h"
 #include "settings.h"
 #include "telegator/telegator_config.h"
@@ -187,10 +188,10 @@ int PanelToggle::moveToRight(int right, int top) {
 SidePanel::SidePanel(
 	not_null<QWidget*> parent,
 	not_null<Window::SessionController*> controller,
-	Fn<void(const QString &text)> insertText,
+	not_null<HistoryWidget*> history,
 	Fn<void()> relayout)
 : _controller(controller)
-, _insertText(std::move(insertText))
+, _history(history)
 , _allowed(PanelAllowed(&controller->session())) {
 	if (!_allowed) {
 		return;
@@ -218,10 +219,11 @@ SidePanel::SidePanel(
 
 SidePanel::~SidePanel() = default;
 
-int SidePanel::layout(QRect area) {
+int SidePanel::layout(int left, int top, int right, int bottom) {
 	if (!_allowed) {
 		return 0;
 	}
+	const auto area = QRect(left, top, right - left, bottom - top);
 	const auto width = std::min(
 		style::ConvertScale(kPanelWidth),
 		area.width() - st::columnMinimalWidthMain);
@@ -314,8 +316,9 @@ void SidePanel::handleMessage(const QJsonDocument &message) {
 		sendChat();
 	} else if (event == u"insert_text"_q) {
 		const auto text = object.value(u"text"_q).toString();
-		if (!text.isEmpty()) {
-			_insertText(text);
+		// History widget is hidden while another section (a topic) is shown.
+		if (!text.isEmpty() && !_history->isHidden()) {
+			_history->insertTextAtCursor(text);
 		}
 	}
 }

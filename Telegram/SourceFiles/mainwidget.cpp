@@ -286,15 +286,7 @@ MainWidget::MainWidget(
 	: nullptr)
 , _playerPlaylist(this, _controller)
 , _changelogs(Core::Changelogs::Create(&controller->session())) {
-	_telegatorPanel = std::make_unique<Telegator::SidePanel>( // Telegator
-		this,
-		_controller,
-		[=](const QString &text) {
-			if (!_mainSection) {
-				_history->insertTextAtCursor(text);
-			}
-		},
-		[=] { updateControlsGeometry(); });
+	_telegatorPanel = std::make_unique<Telegator::SidePanel>(this, _controller, _history.get(), [=] { updateControlsGeometry(); }); // Telegator
 	if (_dialogs) {
 		setupConnectingWidget();
 	}
@@ -2773,11 +2765,7 @@ void MainWidget::updateControlsGeometry() {
 				width() - st::columnMinimalWidthMain);
 			_dialogs->setGeometryToLeft(0, 0, dialogsWidth, height());
 		}
-		thirdSectionWidth += _telegatorPanel->layout(QRect( // Telegator
-			dialogsWidth,
-			getThirdSectionTop(),
-			width() - dialogsWidth - thirdSectionWidth,
-			height() - getThirdSectionTop()));
+		thirdSectionWidth += _telegatorPanel->layout(dialogsWidth, getThirdSectionTop(), width() - thirdSectionWidth, height()); // Telegator
 		if (_sideShadow) {
 			_sideShadow->setGeometryToLeft(
 				dialogsWidth,
