@@ -32,13 +32,14 @@
 - Репозиторий, облачная сборка macOS (Debug), кеш библиотек, секреты API.
 - Модуль `telegator/` (`Telegram/cmake/telegator.cmake`); PoC-кнопка —
   `telegator/telegator_compose_buttons.*`, в `history_widget` — точки вызова.
+- Переименование в Telegator: имя, bundle id `io.github.kdedushev.telegator`,
+  папка данных, AppId, AppUserModelId; ссылки `tg:` и ярлык Windows остаются
+  за официальным клиентом. Проверено в сборке рядом с Telegram Desktop.
+  Иконки пока от Telegram.
 
 ## Очередь
 
-1. **Переименование**: `core/version.h` (AppName, AppFile, AppId), bundle id в
-   `Telegram/CMakeLists.txt`, `AppUserModelIdBase` в
-   `platform/win/windows_app_user_model_id.cpp`, имя `.app`, иконки. Проверка:
-   ставится рядом с Telegram Desktop со своей папкой данных.
+1. **Иконки Telegator** — свои вместо логотипа Telegram (нужен рисунок).
 2. **Панель Telegator (PoC)**: панель справа от чата со значком в шапке,
    внутри webview (`lib_webview`, как мини-приложения ботов) грузит тестовую
    страницу; клиент передаёт странице открытый чат; мост страница→клиент —
