@@ -81,19 +81,19 @@ jobs:
           cd $REPO_NAME/Telegram
 
           ./configure.sh \
-          -D CMAKE_CONFIGURATION_TYPES=Release \
+          -D CMAKE_CONFIGURATION_TYPES=Debug \
           -D CMAKE_COMPILE_WARNING_AS_ERROR=OFF \
           -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON \
           $API_DEFINES
 
-          cmake --build ../out --config Release --parallel
+          cmake --build ../out --config Debug --parallel
 
       - name: Package artifact.
         if: env.ONLY_CACHE == 'false'
         run: |
-          cd $REPO_NAME/out/Release
+          cd $REPO_NAME/out/Debug
           mkdir artifact
           cp -a Telegram.app artifact/
           cd artifact
@@ -104,5 +104,5 @@ jobs:
         name: Upload artifact.
         with:
           name: Telegator-macos
-          path: ${{ env.REPO_NAME }}/out/Release/Telegator-macos.zip
+          path: ${{ env.REPO_NAME }}/out/Debug/Telegator-macos.zip
           retention-days: 14
