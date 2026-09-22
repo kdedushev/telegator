@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "core/application.h"
 #include "core/click_handler_types.h" // ClickHandlerContext
+#include "telegator/telegator_mono_copy.h" // Telegator
 #include "core/ui_integration.h"
 #include "core/update_checker.h"
 #include "history/view/history_view_cursor_state.h"
@@ -4809,6 +4810,13 @@ bool Message::getStateText(
 			point - trect.topLeft(),
 			std::max(textRealWidth(), trect.width()),
 			request.forText()));
+		if (!outResult->link && (request.flags & Ui::Text::StateRequest::Flag::LookupLink)) { // Telegator
+			outResult->link = Telegator::MultilineCodeLink(
+				item,
+				text(),
+				point - trect.topLeft(),
+				std::max(textRealWidth(), trect.width()));
+		}
 		if (outResult->link
 			&& IsRippleLink(outResult->link)
 			&& !text().linkRangeFor(outResult->link).empty()) {

@@ -10,6 +10,8 @@ PRIVATE
     telegator/telegator_field.h
     telegator/telegator_id_search.cpp
     telegator/telegator_id_search.h
+    telegator/telegator_mono_copy.cpp
+    telegator/telegator_mono_copy.h
     telegator/telegator_panel.cpp
     telegator/telegator_panel.h
     telegator/telegator_quick_replies.cpp
