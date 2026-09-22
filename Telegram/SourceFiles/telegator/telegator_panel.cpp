@@ -561,6 +561,9 @@ void SidePanel::createWebview() {
 		Webview::WindowConfig{
 			.opaqueBg = st::windowBg->c,
 			.storageId = PanelStorageId(),
+			// Only the owner's page or the built-in one is ever shown here,
+			// the fraud check of WebKit flags the built-in page otherwise.
+			.safe = true,
 		});
 	const auto raw = _webview.get();
 	if (!raw->widget()) {
