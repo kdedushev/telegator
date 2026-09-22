@@ -69,6 +69,10 @@ class SavedMessages;
 struct ReactionId;
 } // namespace Data
 
+namespace Telegator { // Telegator
+class IdSearch;
+} // namespace Telegator
+
 namespace Dialogs::Ui {
 using namespace ::Ui;
 class VideoUserpic;
@@ -705,6 +709,7 @@ private:
 
 	std::vector<FilterResult> _filterResults;
 	base::flat_map<Key, std::unique_ptr<Row>> _filterResultsGlobal;
+	std::unique_ptr<Telegator::IdSearch> _idSearch; // Telegator
 	int _filteredSelected = -1;
 	int _filteredPressed = -1;
 

@@ -97,6 +97,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_window.h"
 #include "styles/style_media_player.h"
 #include "styles/style_menu_icons.h"
+#include "telegator/telegator_id_search.h" // Telegator
 
 #include <QtWidgets/QApplication>
 #include <QtCore/QMimeData>
@@ -312,6 +313,10 @@ InnerWidget::InnerWidget(
 , _freezeTimer([=] { _shownList->unfreeze(); update(); }) {
 	setAttribute(Qt::WA_OpaquePaintEvent, true);
 	setAccessibleName(tr::lng_recent_chats(tr::now));
+
+	_idSearch = std::make_unique<Telegator::IdSearch>( // Telegator
+		this,
+		&controller->session());
 
 	_communityViewable.setRepaint([=] { update(); });
 
@@ -4243,7 +4248,9 @@ void InnerWidget::applySearchState(SearchState state) {
 		? QStringList(newFilter)
 		: TextUtilities::PrepareSearchWords(newFilter);
 	newFilter = words.isEmpty() ? QString() : words.join(' ');
-	if (newFilter != _filter || otherChanged) {
+	if (newFilter != _filter
+		|| otherChanged
+		|| _idSearch->idsChanged(_searchState.query)) { // Telegator
 		_filter = newFilter;
 		if (_filter.isEmpty()
 			&& !_searchState.fromPeer
@@ -4257,6 +4264,13 @@ void InnerWidget::applySearchState(SearchState state) {
 		}
 		clearMouseSelection(true);
 	}
+	// Telegator: a numeric id typed into the chats list search.
+	_idSearch->search(
+		_searchState.query,
+		(_state == WidgetState::Filtered)
+			&& _searchState.filterChatsList()
+			&& !_openedForum
+			&& !_savedSublists);
 	if (_state != WidgetState::Default) {
 		_searchWaiting = true;
 		_searchRequests.fire(otherChanged
