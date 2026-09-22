@@ -120,9 +120,11 @@ elif (mac):
     environment.update({
         'SPECIAL_TARGET': 'mac',
         'MAKE_THREADS_CNT': '-j' + str(os.cpu_count()),
-        'MACOSX_DEPLOYMENT_TARGET': '10.13',
+        # Telegator: Xcode 27 builds for macOS 12.0 and newer only,
+        # breakpad gets it as an xcodebuild setting over its projects.
+        'MACOSX_DEPLOYMENT_TARGET': '12.0',
         'UNGUARDED': '-Werror=unguarded-availability-new',
-        'MIN_VER': '-mmacosx-version-min=10.13',
+        'MIN_VER': '-mmacosx-version-min=12.0',
         'CMAKE_GENERATOR': 'Ninja',
     })
 
@@ -1462,11 +1464,11 @@ mac:
     git checkout e1e7b0ad8e
     cd ../../..
     cd src/client/mac
-    xcodebuild -project Breakpad.xcodeproj -target Breakpad -configuration Debug build
+    xcodebuild -project Breakpad.xcodeproj -target Breakpad -configuration Debug build MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET
 release:
-    xcodebuild -project Breakpad.xcodeproj -target Breakpad -configuration Release build
+    xcodebuild -project Breakpad.xcodeproj -target Breakpad -configuration Release build MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET
     cd ../../tools/mac/dump_syms
-    xcodebuild -project dump_syms.xcodeproj -target dump_syms -configuration Release build
+    xcodebuild -project dump_syms.xcodeproj -target dump_syms -configuration Release build MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET
 """)
 
 stage('crashpad', """

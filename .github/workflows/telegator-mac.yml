@@ -86,6 +86,8 @@ jobs:
           -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON \
+          -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+          -D CMAKE_CXX_FLAGS=-DMETA_NO_STD_FORWARD_DECLARATIONS \
           $API_DEFINES
 
           cmake --build ../out --config Debug --parallel

@@ -37,36 +37,68 @@
 
 ## Сборка
 
-Сейчас только в облаке: GitHub Actions → **Telegator macOS**.
+Локально на Mac владельца (Xcode 27). Облако — запасной путь.
+
+**Библиотеки** — один раз и после того, как Telegram изменит
+`Telegram/build/prepare/prepare.py` (~1 час, 27 ГБ):
+
+```bash
+cd ~/Projects/telegator-wt/<задача> && ./Telegram/build/prepare/mac.sh skip-release silent
+```
+
+- Скрипт кладёт `Libraries/` и `ThirdParty/` в папку над своей копией
+  репозитория, то есть в `~/Projects/telegator-wt/`, общие для всех worktree.
+  Не запускай его из `~/Projects/telegator`: библиотеки лягут в `~/Projects`.
+- Xcode 27 собирает только под macOS 12.0 и новее: в `prepare.py` версия
+  поднята до 12.0 (метка `# Telegator`), клиенту — `CMAKE_OSX_DEPLOYMENT_TARGET`.
+- Библиотеки собраны в Debug (`skip-release`), поэтому и клиент Debug. Для
+  раздачи сотрудникам — пересобрать библиотеки без `skip-release`.
+
+**Клиент** (первый раз ~40 минут, дальше — только изменённое):
+
+```bash
+cd ~/Projects/telegator-wt/<задача>/Telegram
+set -a; . ~/Projects/telegator-wt/telegram_api.env; set +a
+./configure.sh -D CMAKE_CONFIGURATION_TYPES=Debug -D CMAKE_COMPILE_WARNING_AS_ERROR=OFF -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 -D CMAKE_CXX_FLAGS=-DMETA_NO_STD_FORWARD_DECLARATIONS -D TDESKTOP_API_ID="$TDESKTOP_API_ID" -D TDESKTOP_API_HASH="$TDESKTOP_API_HASH"
+cmake --build ../out --config Debug --parallel
+```
+
+- Результат — `out/Debug/Telegator.app` внутри worktree.
+- `META_NO_STD_FORWARD_DECLARATIONS` — штатный выключатель range-v3: её
+  предварительные объявления `std::` не собираются с libc++ из Xcode 27.
+- Ключи Telegram API — `~/Projects/telegator-wt/telegram_api.env` (вне git,
+  права 600), строки `TDESKTOP_API_ID=` и `TDESKTOP_API_HASH=`. Те же ключи —
+  в секретах GitHub. Значения не печатать: вывод configure их содержит.
+
+**Облако**: GitHub Actions → **Telegator macOS**, ~85 минут, артефакт
+`Telegator-macos` (zip с `.app`).
 
 ```bash
 gh workflow run "Telegator macOS" --repo kdedushev/telegator --ref main -f only_cache=false
 ```
 
-- ~85 минут. Результат — артефакт `Telegator-macos` (zip с `.app`).
-- `only_cache=true` — только собрать библиотеки в кеш (нужно, если Telegram
-  обновил `Telegram/build/prepare/prepare.py`: кеш привязан к его хэшу).
-- **Библиотеки в кеше собраны в Debug** (`prepare/mac.sh skip-release`),
-  поэтому клиент собирается тоже в Debug. Для релиза сотрудникам нужно убрать
-  `skip-release`, сменить ключ кеша и пересобрать библиотеки.
-- Ключи Telegram API — в секретах репозитория `TDESKTOP_API_ID` / `TDESKTOP_API_HASH`.
-  Без них конвейер подставляет тестовые ключи Telegram (вход ограничен).
+- `only_cache=true` — только собрать библиотеки в кеш. Кеш привязан к хэшу
+  `prepare.py`, поэтому после его изменения первая сборка — с библиотеками.
+- Ключи — секреты репозитория `TDESKTOP_API_ID` / `TDESKTOP_API_HASH`; без них
+  подставляются тестовые ключи Telegram (вход сильно ограничен).
 - Все унаследованные workflow Telegram отключены через `gh workflow disable`.
   Не включай их и не удаляй их файлы (удаление = конфликты при обновлении).
-- Локальная сборка станет возможна, когда владелец установит Xcode
-  (нужен macOS 26.6+). Порядок — `docs/building-mac.md`.
 
 ## Запуск собранного клиента на Mac владельца
 
 Клиент называется Telegator (bundle id `io.github.kdedushev.telegator`,
 данные — `~/Library/Application Support/Telegator/`) и ставится рядом с
 Telegram Desktop, не трогая его сессию. Тестовые сборки всё равно запускай
-с папкой данных внутри сборки — чтобы не задеть рабочий Telegator и удалять
-сборку целиком:
+с отдельной папкой данных — чтобы не задеть рабочий Telegator:
 
 ```bash
-open -n builds/<папка>/Telegator.app --args -workdir ~/Projects/telegator/builds/<папка>/workdir/
+open -n ~/Projects/telegator-wt/<задача>/out/Debug/Telegator.app --args -workdir ~/Projects/telegator-wt/workdir/
 ```
+
+- `~/Projects/telegator-wt/workdir/` — одна тестовая папка для всех локальных
+  сборок: владелец входит в аккаунт один раз. Там же `telegator.json`.
+- Облачную сборку — с папкой данных внутри неё, чтобы удалять целиком:
+  `open -n builds/<папка>/Telegator.app --args -workdir ~/Projects/telegator/builds/<папка>/workdir/`.
 
 Для ручной проверки сообщений — чат «Избранное», не живые собеседники.
 
