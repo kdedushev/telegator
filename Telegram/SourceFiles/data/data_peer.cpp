@@ -787,7 +787,7 @@ bool PeerData::canEditMessagesIndefinitely() const {
 }
 
 bool PeerData::canExportChatHistory() const {
-	if (isRepliesChat() || isVerifyCodes() || !allowsForwarding()) {
+	if (isRepliesChat() || isVerifyCodes() || !allowsForwardingReal()) { // Telegator
 		return false;
 	} else if (const auto channel = asChannel()) {
 		if (!channel->amIn() && channel->invitePeekExpires()) {
@@ -1734,6 +1734,12 @@ void PeerData::processTopics(const MTPVector<MTPForumTopic> &topics) {
 }
 
 bool PeerData::allowsForwarding() const {
+	// Telegator: text and media of protected chats can be copied and saved,
+	// forwarding and settings check the real flag, the server enforces it.
+	return true;
+}
+
+bool PeerData::allowsForwardingReal() const { // Telegator
 	if (const auto user = asUser()) {
 		return user->allowsForwarding();
 	} else if (const auto channel = asChannel()) {

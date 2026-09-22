@@ -3187,8 +3187,8 @@ bool HistoryItem::allowsReschedule() const {
 bool HistoryItem::allowsForward() const {
 	return !isService()
 		&& (isRegular() || isEphemeral())
-		&& !forbidsForward()
-		&& history()->peer->allowsForwarding()
+		&& !(_flags & MessageFlag::NoForwards) // Telegator
+		&& history()->peer->allowsForwardingReal() // Telegator
 		&& (!_media || _media->allowsForward());
 }
 
@@ -3258,7 +3258,7 @@ bool HistoryItem::canStopPoll() const {
 }
 
 bool HistoryItem::forbidsForward() const {
-	return (_flags & MessageFlag::NoForwards);
+	return false; // Telegator: protected messages can be copied and saved.
 }
 
 bool HistoryItem::forbidsSaving() const {
