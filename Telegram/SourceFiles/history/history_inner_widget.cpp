@@ -130,6 +130,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/ui/dialogs_video_userpic.h"
 #include "styles/style_chat.h"
 #include "styles/style_menu_icons.h"
+#include "telegator/telegator_requisites.h" // Telegator
 
 #include <QtGui/QClipboard>
 #include <QtWidgets/QApplication>
@@ -3832,6 +3833,7 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			textItem ? textItem : _dragStateItem,
 			!added);
 	}
+	Telegator::AddMessageActions(_menu.get(), _controller, leaderOrSelf); // Telegator
 	if (hasWhoReactedItem) {
 		HistoryView::AddWhoReactedAction(
 			_menu,

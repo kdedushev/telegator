@@ -6,8 +6,14 @@ PRIVATE
     telegator/telegator_compose_buttons.h
     telegator/telegator_config.cpp
     telegator/telegator_config.h
+    telegator/telegator_field.cpp
+    telegator/telegator_field.h
     telegator/telegator_id_search.cpp
     telegator/telegator_id_search.h
     telegator/telegator_panel.cpp
     telegator/telegator_panel.h
+    telegator/telegator_quick_replies.cpp
+    telegator/telegator_quick_replies.h
+    telegator/telegator_requisites.cpp
+    telegator/telegator_requisites.h
 )

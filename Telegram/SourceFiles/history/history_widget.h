@@ -262,6 +262,7 @@ public:
 	void hideSingleUseKeyboard(FullMsgId replyToId);
 	bool insertBotCommand(const QString &cmd);
 	void insertTextAtCursor(const QString &text);
+	[[nodiscard]] Ui::InputField *telegatorField() const { return _field.data(); } // Telegator
 
 	bool eventFilter(QObject *obj, QEvent *e) override;
 

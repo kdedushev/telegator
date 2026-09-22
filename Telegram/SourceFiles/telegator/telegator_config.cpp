@@ -16,7 +16,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Telegator {
 namespace {
 
-[[nodiscard]] PanelConfig ReadPanel() {
+struct Config {
+	PanelConfig panel;
+	RequisitesConfig requisites;
+};
+
+[[nodiscard]] Config ReadConfig() {
 	auto file = QFile(cWorkingDir() + u"telegator.json"_q);
 	if (!file.open(QIODevice::ReadOnly)) {
 		return {};
@@ -27,23 +32,35 @@ namespace {
 		LOG(("Telegator: bad telegator.json: %1").arg(error.errorString()));
 		return {};
 	}
+	auto result = Config();
 	const auto panel = document.object().value(u"panel"_q).toObject();
-	auto result = PanelConfig();
 	for (const auto &value : panel.value(u"accounts"_q).toArray()) {
 		const auto id = value.toVariant().toULongLong();
 		if (id) {
-			result.accounts.push_back(id);
+			result.panel.accounts.push_back(id);
 		}
 	}
-	result.url = panel.value(u"url"_q).toString().trimmed();
+	result.panel.url = panel.value(u"url"_q).toString().trimmed();
+	const auto requisites = document.object().value(
+		u"requisites"_q).toObject();
+	result.requisites.url = requisites.value(
+		u"url"_q).toString().trimmed();
+	return result;
+}
+
+[[nodiscard]] const Config &Read() {
+	static const auto result = ReadConfig();
 	return result;
 }
 
 } // namespace
 
 const PanelConfig &Panel() {
-	static const auto result = ReadPanel();
-	return result;
+	return Read().panel;
+}
+
+const RequisitesConfig &Requisites() {
+	return Read().requisites;
 }
 
 bool PanelAllowed(not_null<Main::Session*> session) {

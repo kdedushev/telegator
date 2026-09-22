@@ -15,6 +15,7 @@ class HistoryWidget;
 
 namespace Ui {
 class RpWidget;
+class RippleButton;
 } // namespace Ui
 
 namespace Webview {
@@ -26,6 +27,27 @@ class SessionController;
 } // namespace Window
 
 namespace Telegator {
+
+class QuickReplies;
+
+enum class PanelButtonPlace {
+	TopBar,
+	Compose,
+};
+
+// Icon button that shows or hides the side panel, looks like the other
+// buttons of its place. Null for accounts without the panel.
+[[nodiscard]] object_ptr<Ui::RippleButton> MakePanelButton(
+	not_null<QWidget*> parent,
+	not_null<Window::SessionController*> controller,
+	PanelButtonPlace place);
+
+// Puts text into the message field if peer's chat is the open one,
+// focuses the field so that Enter sends it.
+bool InsertIntoChat(
+	not_null<Window::SessionController*> controller,
+	not_null<PeerData*> peer,
+	TextWithTags text);
 
 // Button in the chat top bar that shows or hides the side panel.
 class PanelToggle final {
@@ -41,14 +63,13 @@ public:
 	[[nodiscard]] int moveToRight(int right, int top);
 
 private:
-	class Button;
-
-	object_ptr<Button> _button = { nullptr };
+	object_ptr<Ui::RippleButton> _button = { nullptr };
 
 };
 
-// Web page from the owner's server shown at the right of the open chat.
-// The page gets the open chat and may ask to insert text into the field.
+// Web page from the owner's server shown at the right of the open chat,
+// or the built-in page with the account quick replies when there is none.
+// The page gets the open chat and may put text into the message field.
 class SidePanel final {
 public:
 	SidePanel(
@@ -64,15 +85,23 @@ public:
 
 private:
 	void createWebview();
+	void setupResize();
 	void handleMessage(const QJsonDocument &message);
 	void sendChat();
+	void sendQuickReplies();
+	void sendTheme();
+	void eval(const QByteArray &script);
 	[[nodiscard]] bool allowedNavigation(const QString &uri) const;
 
 	const not_null<Window::SessionController*> _controller;
 	const not_null<HistoryWidget*> _history;
+	const Fn<void()> _relayout;
 	const bool _allowed = false;
+	std::unique_ptr<QuickReplies> _quickReplies;
 	base::unique_qptr<Ui::RpWidget> _body;
 	std::unique_ptr<Webview::Window> _webview;
+	int _width = 0;
+	int _maxWidth = 0;
 	bool _pageReady = false;
 
 };

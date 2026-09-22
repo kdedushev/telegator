@@ -321,13 +321,8 @@ HistoryWidget::HistoryWidget(
 , _attachToggle(this, st::historyAttach)
 , _telegator(std::make_unique<Telegator::ComposeButtons>( // Telegator
 	this,
-	_attachToggle->shownValue(),
-	[=](const QString &text) {
-		if (_history && !_editMsgId) {
-			_field->setTextWithTags({ text, {} });
-			send({});
-		}
-	}))
+	controller,
+	_attachToggle->shownValue()))
 , _tabbedSelectorToggle(this, st::historyAttachEmoji)
 , _botKeyboardShow(this, st::historyBotKeyboardShow)
 , _botKeyboardHide(this, st::historyBotKeyboardHide)

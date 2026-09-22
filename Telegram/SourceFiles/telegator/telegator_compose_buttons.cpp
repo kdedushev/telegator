@@ -6,40 +6,36 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "telegator/telegator_compose_buttons.h"
 
+#include "telegator/telegator_panel.h"
 #include "ui/widgets/buttons.h"
-#include "styles/style_chat.h"
 
 namespace Telegator {
 
 ComposeButtons::ComposeButtons(
 	not_null<QWidget*> parent,
-	rpl::producer<bool> shown,
-	Fn<void(const QString &text)> sendText)
-: _test(parent, rpl::single(u"TEST"_q), st::historyBotMenuButton) {
-	_test->setFullRadius(true);
-	_test->setClickedCallback([=] {
-		sendText(u"Тестовая заготовка"_q);
-	});
+	not_null<Window::SessionController*> controller,
+	rpl::producer<bool> shown)
+: _panel(MakePanelButton(parent, controller, PanelButtonPlace::Compose)) {
+	if (!_panel) {
+		return;
+	}
 	std::move(shown) | rpl::on_next([=](bool shown) {
-		_test->setVisible(shown);
-	}, _test->lifetime());
+		_panel->setVisible(shown);
+	}, _panel->lifetime());
 }
 
 ComposeButtons::~ComposeButtons() = default;
 
 int ComposeButtons::width() const {
-	return _test->isHidden()
-		? 0
-		: (st::historyBotMenuSkip + _test->width());
+	return (!_panel || _panel->isHidden()) ? 0 : _panel->width();
 }
 
 int ComposeButtons::moveToLeft(int left, int top) {
-	if (_test->isHidden()) {
+	if (!_panel || _panel->isHidden()) {
 		return left;
 	}
-	const auto skip = st::historyBotMenuSkip;
-	_test->moveToLeft(left + skip, top + skip);
-	return left + skip + _test->width();
+	_panel->moveToLeft(left, top);
+	return left + _panel->width();
 }
 
 } // namespace Telegator

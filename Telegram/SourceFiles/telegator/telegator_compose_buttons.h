@@ -9,18 +9,23 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/object_ptr.h"
 
 namespace Ui {
-class RoundButton;
+class RippleButton;
 } // namespace Ui
+
+namespace Window {
+class SessionController;
+} // namespace Window
 
 namespace Telegator {
 
-// Action buttons placed next to the attach button in the compose area.
+// Buttons placed next to the attach button in the compose area:
+// the one that shows or hides the side panel, for accounts with the panel.
 class ComposeButtons final {
 public:
 	ComposeButtons(
 		not_null<QWidget*> parent,
-		rpl::producer<bool> shown,
-		Fn<void(const QString &text)> sendText);
+		not_null<Window::SessionController*> controller,
+		rpl::producer<bool> shown);
 	~ComposeButtons();
 
 	// Horizontal space the buttons take in the compose area.
@@ -30,7 +35,7 @@ public:
 	[[nodiscard]] int moveToLeft(int left, int top);
 
 private:
-	object_ptr<Ui::RoundButton> _test;
+	object_ptr<Ui::RippleButton> _panel;
 
 };
 
