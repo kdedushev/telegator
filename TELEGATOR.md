@@ -43,7 +43,7 @@
 `Telegram/build/prepare/prepare.py` (~1 час, 27 ГБ):
 
 ```bash
-cd ~/Projects/telegator-wt/<задача> && ./Telegram/build/prepare/mac.sh skip-release silent
+cd ~/Projects/telegator-wt/dev && ./Telegram/build/prepare/mac.sh skip-release silent
 ```
 
 - Скрипт кладёт `Libraries/` и `ThirdParty/` в папку над своей копией
@@ -57,13 +57,16 @@ cd ~/Projects/telegator-wt/<задача> && ./Telegram/build/prepare/mac.sh ski
 **Клиент** (первый раз ~40 минут, дальше — только изменённое):
 
 ```bash
-cd ~/Projects/telegator-wt/<задача>/Telegram
+cd ~/Projects/telegator-wt/dev/Telegram
 set -a; . ~/Projects/telegator-wt/telegram_api.env; set +a
 ./configure.sh -D CMAKE_CONFIGURATION_TYPES=Debug -D CMAKE_COMPILE_WARNING_AS_ERROR=OFF -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 -D CMAKE_CXX_FLAGS=-DMETA_NO_STD_FORWARD_DECLARATIONS -D TDESKTOP_API_ID="$TDESKTOP_API_ID" -D TDESKTOP_API_HASH="$TDESKTOP_API_HASH"
-cmake --build ../out --config Debug --parallel
+nice -n 10 cmake --build ../out --config Debug --parallel 4
 ```
 
-- Результат — `out/Debug/Telegator.app` внутри worktree.
+- `--parallel 4` и `nice`: на Mac владельца 16 ГБ памяти, без ограничения
+  Xcode запускает ~20 компиляторов, Mac уходит в подкачку и зависает.
+- Результат — `out/Debug/Telegator.app` внутри worktree. Configure нужен один
+  раз на worktree; дальше только `cmake --build`.
 - `META_NO_STD_FORWARD_DECLARATIONS` — штатный выключатель range-v3: её
   предварительные объявления `std::` не собираются с libc++ из Xcode 27.
 - Ключи Telegram API — `~/Projects/telegator-wt/telegram_api.env` (вне git,
@@ -92,11 +95,12 @@ Telegram Desktop, не трогая его сессию. Тестовые сбо
 с отдельной папкой данных — чтобы не задеть рабочий Telegator:
 
 ```bash
-open -n ~/Projects/telegator-wt/<задача>/out/Debug/Telegator.app --args -workdir ~/Projects/telegator-wt/workdir/
+open -n ~/Projects/telegator-wt/dev/out/Debug/Telegator.app --args -workdir ~/Projects/telegator-wt/workdir/
 ```
 
 - `~/Projects/telegator-wt/workdir/` — одна тестовая папка для всех локальных
-  сборок: владелец входит в аккаунт один раз. Там же `telegator.json`.
+  сборок: владелец входит в аккаунт один раз. Там же `telegator.json`
+  (формат — `telegator/telegator_config.h`).
 - Облачную сборку — с папкой данных внутри неё, чтобы удалять целиком:
   `open -n builds/<папка>/Telegator.app --args -workdir ~/Projects/telegator/builds/<папка>/workdir/`.
 
@@ -132,8 +136,11 @@ git rebase <новый тег или upstream/dev>
 
 ## Гигиена — чтобы не копился мусор
 
-- **Одна задача — одна ветка и один worktree** в `~/Projects/telegator-wt/<задача>`.
-  После слияния в `main`: `git worktree remove`, удалить ветку локально и на GitHub.
+- **Сборка — в постоянном worktree `~/Projects/telegator-wt/dev`**: в нём `out/`
+  (полная сборка ~30 минут, дальше минуты). Каждая задача — своя ветка,
+  переключаемая в `dev`; отдельный worktree — только для параллельной задачи
+  в другом чате, со своей полной сборкой. `git worktree move` с подмодулями
+  не работает. После слияния в `main` — удалить ветку локально и на GitHub.
 - **`builds/` — только последняя сборка.** Перед удалением старой: закрыть
   клиент и выйти в нём из аккаунта (иначе на сервере Telegram остаётся
   активная сессия), затем удалить папку целиком вместе с `workdir/`.
