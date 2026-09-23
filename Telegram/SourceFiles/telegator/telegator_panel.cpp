@@ -304,7 +304,9 @@ document.addEventListener('DOMContentLoaded', function () {
 	auto result = QJsonObject();
 	result.insert(u"id"_q, QString::number(item->id.bare));
 	result.insert(u"text"_q, item->originalText().text);
-	result.insert(u"out"_q, item->out());
+	result.insert(
+		u"out"_q,
+		item->out() || item->history()->peer->isSelf());
 	result.insert(u"forwarded"_q, item->Has<HistoryMessageForwarded>());
 	result.insert(u"date"_q, item->date());
 	return result;
@@ -546,8 +548,15 @@ not_null<HistoryWidget*> SidePanel::history() const {
 
 void SidePanel::chooseMenu(QByteArray event) {
 	_menuEvent = std::move(event);
-	Shown(_controller) = true;
+	show();
 	sendMenuEvent();
+}
+
+void SidePanel::show() {
+	// The profile column hides the panel without changing Shown.
+	_controller->closeThirdSection();
+	Shown(_controller) = true;
+	_relayout();
 }
 
 int SidePanel::layout(int left, int top, int right, int bottom) {
@@ -697,7 +706,7 @@ void SidePanel::handleMessage(const QJsonDocument &message) {
 			&_controller->session(),
 			ParseMenu(object.value(u"items"_q).toArray()));
 	} else if (event == u"open"_q) {
-		Shown(_controller) = true;
+		show();
 	} else if (event == u"insert_text"_q) {
 		// The chat the page meant must still be the open one.
 		const auto chat = object.value(u"chat"_q).toString();

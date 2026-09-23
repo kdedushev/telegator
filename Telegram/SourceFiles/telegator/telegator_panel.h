@@ -92,6 +92,7 @@ public:
 	void chooseMenu(QByteArray event);
 
 private:
+	void show();
 	void createWebview();
 	void showNotice(const QString &text);
 	void setupResize();
