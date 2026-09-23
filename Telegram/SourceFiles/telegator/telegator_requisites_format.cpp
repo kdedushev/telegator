@@ -626,7 +626,8 @@ const auto kGenericBank = uR"re((?<![\w])(?:([A-Za-zА-Яа-яЁё][\w\-]{1,})[ 
 const auto kPatronymic = uR"re((ович|евич|ьич|овна|евна|ична|инична|оглы|кызы)$)re"_q;
 const auto kWord = uR"re([A-Za-zА-Яа-яЁё]+(?:-[A-Za-zА-Яа-яЁё]+)*\.?)re"_q;
 const auto kSegmentBreak = uR"re([\n\x00,;:()!?/|«»\"—–]|(?<=[а-яёa-z]{2})\.\s+|(?<!\w)(?i:или|либо)(?!\w))re"_q;
-const auto kLabel = uR"re((?i)^(?:(?P<bank>(?:beneficiary\s+)?bank(?:\s+name)?|банк(?:\s+получателя)?|название\s+банка)|(?P<swift>swift(?:\s*/\s*bic)?(?:\s+code)?|bic(?:\s+code)?|свифт|бик)|iban|acc(?:ount)?(?:\s*(?:number|no\.?|№))?|(?:номер\s+)?сч[её]та?|р\s*/\s*с|card(?:\s+number)?|(?:номер\s+)?карты|карта|phone|(?:номер\s+)?телефона?|тел\.?|(?:full\s+)?name|beneficiary(?:\s+name)?|recipient(?:\s+name)?|имя(?:\s+получателя)?|фио|получатель)\s*:\s*)re"_q;
+const auto kLabel = uR"re((?i)^(?:(?P<bank>(?:beneficiary\s+)?bank(?:\s+name)?|банк(?:\s+получателя)?|название\s+банка)|swift(?:\s*/\s*bic)?(?:\s+code)?|bic(?:\s+code)?|свифт|бик|iban|acc(?:ount)?(?:\s*(?:number|no\.?|№))?|(?:номер\s+)?сч[её]та?|р\s*/\s*с|card(?:\s+number)?|(?:номер\s+)?карты|карта|phone|(?:номер\s+)?телефона?|тел\.?|(?:full\s+)?name|beneficiary(?:\s+name)?|recipient(?:\s+name)?|имя(?:\s+получателя)?|фио|получатель)\s*:\s*)re"_q;
+const auto kLabelWord = uR"re((?i)^(?:(?P<bank>(?:beneficiary\s+)?bank(?:\s+name)?|банк(?:\s+получателя)?)|(?P<name>(?:full\s+)?name|beneficiary(?:\s+name)?|recipient(?:\s+name)?|имя(?:\s+получателя)?|фио|получатель)|(?P<code>swift(?:\s*/\s*bic)?(?:\s+code)?|bic(?:\s+code)?|свифт|бик|iban|acc(?:ount)?(?:\s*(?:number|no\.?|№))?|(?:номер\s+)?сч[её]та?))(?:\s*[-–—]\s*|\s+)(?=\S))re"_q;
 const auto kSwiftLine = uR"re((?i)(?<!\w)(?:swift|bic|бик|свифт)(?!\w))re"_q;
 const auto kBic = uR"re((?<![A-Za-z0-9])[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?(?![A-Za-z0-9]))re"_q;
 const auto kHintClient = u"Напишите реквизиты своим сообщением и нажмите "
@@ -1241,6 +1242,37 @@ const auto kBadCard = u"Номер карты не проходит провер
 	return options;
 }
 
+struct Unlabeled {
+	QString value;
+	bool labeled = false;
+	bool bank = false;
+};
+
+[[nodiscard]] Unlabeled Unlabel(const QString &line) {
+	const auto label = Search(kLabel, line);
+	if (label.hasMatch()) {
+		return {
+			Strip(line.mid(label.capturedEnd())),
+			true,
+			!label.captured(u"bank"_q).isEmpty(),
+		};
+	}
+	const auto word = Search(kLabelWord, line);
+	if (!word.hasMatch()) {
+		return { line };
+	}
+	const auto rest = Strip(line.mid(word.capturedEnd()));
+	const auto valued = !word.captured(u"code"_q).isEmpty()
+		? MatchAt(uR"re([A-Z0-9]{4})re"_q, rest).hasMatch()
+		: !word.captured(u"name"_q).isEmpty()
+		? ForeignName(rest)
+		: !Banks(rest).empty();
+	if (!valued) {
+		return { line };
+	}
+	return { rest, true, !word.captured(u"bank"_q).isEmpty() };
+}
+
 [[nodiscard]] Set Foreign(
 		const QString &text,
 		const std::vector<Found> &banks,
@@ -1252,10 +1284,7 @@ const auto kBadCard = u"Номер карты не проходит провер
 		if (clean.isEmpty() || Search(kNegative, Lower(clean)).hasMatch()) {
 			continue;
 		}
-		const auto label = Search(kLabel, clean);
-		const auto value = label.hasMatch()
-			? Strip(clean.mid(label.capturedEnd()))
-			: clean;
+		const auto [value, labeled, bankLabel] = Unlabel(clean);
 		if (value.isEmpty()) {
 			continue;
 		}
@@ -1271,12 +1300,11 @@ const auto kBadCard = u"Номер карты не проходит провер
 				ids = true;
 			}
 		}
-		const auto bank = !label.captured(u"bank"_q).isEmpty()
+		const auto bank = bankLabel
 			|| !Banks(value).empty()
 			|| !GenericBanks(value).empty();
-		const auto swift = !label.captured(u"swift"_q).isEmpty()
-			|| Search(kSwiftLine, value).hasMatch();
-		if (label.hasMatch() || ids || bank || swift || ForeignName(value)) {
+		const auto swift = Search(kSwiftLine, value).hasMatch();
+		if (labeled || ids || bank || swift || ForeignName(value)) {
 			kept.emplace_back(bank, value);
 		}
 	}

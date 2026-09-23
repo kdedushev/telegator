@@ -185,6 +185,22 @@ void CheckForeignLabelsDropped() {
 		u"foreign labels dropped: Account, Name"_q,
 		u"TBC\nAccount: "_q + iban + u"\nName: Maria Ivanova"_q,
 		{ expected });
+	CheckExpected(
+		u"foreign labels dropped: IBAN without colon"_q,
+		u"TBC\nIBAN "_q + iban + u"\nMaria Ivanova"_q,
+		{ expected });
+	CheckExpected(
+		u"foreign labels dropped: IBAN with dash"_q,
+		u"TBC\nIBAN - "_q + iban + u"\nMaria Ivanova"_q,
+		{ expected });
+	CheckExpected(
+		u"foreign labels dropped: Name without colon"_q,
+		u"TBC\n"_q + iban + u"\nName Maria Ivanova"_q,
+		{ expected });
+	CheckExpected(
+		u"foreign bank name kept: bank of Georgia"_q,
+		u"bank of Georgia\n"_q + iban + u"\nMaria Ivanova"_q,
+		{ u"bank of Georgia\n"_q + iban + u"\nMaria Ivanova"_q });
 }
 
 void CheckNamesAsWritten() {
