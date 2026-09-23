@@ -49,7 +49,7 @@ bool InsertIntoChat(
 	not_null<PeerData*> peer,
 	TextWithTags text);
 
-// Items of Telegator.setMenu(), a chosen one opens the panel with its page.
+// "Реквизиты", then items of Telegator.setMenu() that open the page.
 void AddMessageActions(
 	not_null<Ui::PopupMenu*> menu,
 	not_null<Window::SessionController*> controller,

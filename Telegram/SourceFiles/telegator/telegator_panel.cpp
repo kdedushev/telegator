@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings.h"
 #include "telegator/telegator_config.h"
 #include "telegator/telegator_field.h"
+#include "telegator/telegator_requisites.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/rp_widget.h"
 #include "ui/widgets/buttons.h"
@@ -447,6 +448,7 @@ void AddMessageActions(
 		not_null<Ui::PopupMenu*> menu,
 		not_null<Window::SessionController*> controller,
 		HistoryItem *item) {
+	AddRequisitesAction(menu, controller, item);
 	const auto session = &controller->session();
 	if (!item
 		|| !MenuAllowed(item)
