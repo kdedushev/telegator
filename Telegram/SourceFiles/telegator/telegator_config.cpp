@@ -18,7 +18,6 @@ namespace {
 
 struct Config {
 	PanelConfig panel;
-	RequisitesConfig requisites;
 };
 
 [[nodiscard]] Config ReadConfig() {
@@ -41,10 +40,6 @@ struct Config {
 		}
 	}
 	result.panel.url = panel.value(u"url"_q).toString().trimmed();
-	const auto requisites = document.object().value(
-		u"requisites"_q).toObject();
-	result.requisites.url = requisites.value(
-		u"url"_q).toString().trimmed();
 	return result;
 }
 
@@ -57,10 +52,6 @@ struct Config {
 
 const PanelConfig &Panel() {
 	return Read().panel;
-}
-
-const RequisitesConfig &Requisites() {
-	return Read().requisites;
 }
 
 bool PanelAllowed(not_null<Main::Session*> session) {

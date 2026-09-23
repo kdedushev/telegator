@@ -130,7 +130,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "dialogs/ui/dialogs_video_userpic.h"
 #include "styles/style_chat.h"
 #include "styles/style_menu_icons.h"
-#include "telegator/telegator_requisites.h" // Telegator
+#include "telegator/telegator_panel.h" // Telegator
 
 #include <QtGui/QClipboard>
 #include <QtWidgets/QApplication>

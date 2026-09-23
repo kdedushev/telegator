@@ -11,11 +11,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 class QJsonDocument;
 
+class HistoryItem;
 class HistoryWidget;
 
 namespace Ui {
 class RpWidget;
 class RippleButton;
+class PopupMenu;
 } // namespace Ui
 
 namespace Webview {
@@ -27,8 +29,6 @@ class SessionController;
 } // namespace Window
 
 namespace Telegator {
-
-class QuickReplies;
 
 enum class PanelButtonPlace {
 	TopBar,
@@ -49,6 +49,12 @@ bool InsertIntoChat(
 	not_null<PeerData*> peer,
 	TextWithTags text);
 
+// Items of Telegator.setMenu(), a chosen one opens the panel with its page.
+void AddMessageActions(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<Window::SessionController*> controller,
+	HistoryItem *item);
+
 // Button in the chat top bar that shows or hides the side panel.
 class PanelToggle final {
 public:
@@ -67,8 +73,6 @@ private:
 
 };
 
-// Web page from the owner's server shown at the right of the open chat,
-// or the built-in page with the account quick replies when there is none.
 // The page gets the open chat and may put text into the message field.
 class SidePanel final {
 public:
@@ -83,13 +87,19 @@ public:
 	// returns the taken width.
 	[[nodiscard]] int layout(int left, int top, int right, int bottom);
 
+	[[nodiscard]] not_null<HistoryWidget*> history() const;
+
+	void chooseMenu(QByteArray event);
+
 private:
 	void createWebview();
+	void showNotice(const QString &text);
 	void setupResize();
 	void handleMessage(const QJsonDocument &message);
+	void pageReady();
 	void sendChat();
-	void sendQuickReplies();
 	void sendTheme();
+	void sendMenuEvent();
 	void eval(const QByteArray &script);
 	[[nodiscard]] bool allowedNavigation(const QString &uri) const;
 
@@ -97,11 +107,12 @@ private:
 	const not_null<HistoryWidget*> _history;
 	const Fn<void()> _relayout;
 	const bool _allowed = false;
-	std::unique_ptr<QuickReplies> _quickReplies;
 	base::unique_qptr<Ui::RpWidget> _body;
 	std::unique_ptr<Webview::Window> _webview;
+	std::optional<QByteArray> _menuEvent;
 	int _width = 0;
 	int _maxWidth = 0;
+	bool _created = false;
 	bool _pageReady = false;
 
 };

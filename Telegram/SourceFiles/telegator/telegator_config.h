@@ -17,10 +17,7 @@ namespace Telegator {
 // {
 //   "panel": {
 //     "accounts": [ 123456789 ],        // Telegram user ids with the panel
-//     "url": "https://example.com/panel" // empty or missing: built-in page
-//   },
-//   "requisites": {
-//     "url": "https://example.com/requisites" // script for the message menu
+//     "url": "https://example.com/panel" // empty or missing: no page
 //   }
 // }
 struct PanelConfig {
@@ -28,12 +25,7 @@ struct PanelConfig {
 	QString url;
 };
 
-struct RequisitesConfig {
-	QString url;
-};
-
 [[nodiscard]] const PanelConfig &Panel();
-[[nodiscard]] const RequisitesConfig &Requisites();
 [[nodiscard]] bool PanelAllowed(not_null<Main::Session*> session);
 
 } // namespace Telegator

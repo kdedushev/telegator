@@ -7,20 +7,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "telegator/telegator_panel.h"
 
 #include "core/file_utilities.h"
+#include "core/version.h"
+#include "data/data_media_types.h"
 #include "data/data_peer.h"
+#include "data/data_session.h"
 #include "dialogs/dialogs_key.h"
+#include "history/history.h"
+#include "history/history_item.h"
+#include "history/history_item_components.h"
 #include "history/history_widget.h"
 #include "main/main_session.h"
 #include "settings.h"
 #include "telegator/telegator_config.h"
 #include "telegator/telegator_field.h"
-#include "telegator/telegator_quick_replies.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/rp_widget.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/labels.h"
-#include "webview/webview_data_stream_memory.h"
+#include "ui/widgets/popup_menu.h"
 #include "webview/webview_embed.h"
 #include "webview/webview_interface.h"
 #include "window/window_session_controller.h"
@@ -40,6 +45,14 @@ namespace {
 constexpr auto kPanelWidth = 360;
 constexpr auto kPanelMinWidth = 240;
 constexpr auto kResizeArea = 6;
+constexpr auto kBridgeVersion = 1;
+constexpr auto kMenuLimit = 10;
+constexpr auto kMenuTextLimit = 64;
+
+struct MenuItem {
+	QString id;
+	QString label;
+};
 
 [[nodiscard]] rpl::variable<bool> &Shown(
 		not_null<Window::SessionController*> controller) {
@@ -58,38 +71,94 @@ constexpr auto kResizeArea = 6;
 	return *i->second;
 }
 
-// Chat widgets of the windows with the panel, for text insertion.
-[[nodiscard]] auto Histories()
+[[nodiscard]] auto Panels()
 -> base::flat_map<
 		not_null<Window::SessionController*>,
-		not_null<HistoryWidget*>> & {
+		not_null<SidePanel*>> & {
 	static auto result = base::flat_map<
 		not_null<Window::SessionController*>,
-		not_null<HistoryWidget*>>();
+		not_null<SidePanel*>>();
 	return result;
 }
 
-// Panel width set by dragging its left edge, kept between launches.
 [[nodiscard]] QString StatePath() {
 	return cWorkingDir() + u"tdata/telegator_state.json"_q;
 }
 
-[[nodiscard]] int ReadSavedWidth() {
-	auto file = QFile(StatePath());
-	if (!file.open(QIODevice::ReadOnly)) {
-		return 0;
+[[nodiscard]] QJsonObject &State() {
+	static auto result = [] {
+		auto file = QFile(StatePath());
+		return file.open(QIODevice::ReadOnly)
+			? QJsonDocument::fromJson(file.readAll()).object()
+			: QJsonObject();
+	}();
+	return result;
+}
+
+void SaveState(const QString &key, const QJsonValue &value) {
+	auto &state = State();
+	if (state.value(key) == value) {
+		return;
 	}
-	const auto document = QJsonDocument::fromJson(file.readAll());
-	return document.object().value(u"panel_width"_q).toInt();
+	state.insert(key, value);
+	auto file = QFile(StatePath());
+	if (file.open(QIODevice::WriteOnly)) {
+		file.write(QJsonDocument(state).toJson(QJsonDocument::Compact));
+	}
+}
+
+// Panel width set by dragging its left edge, kept between launches.
+[[nodiscard]] int ReadSavedWidth() {
+	return State().value(u"panel_width"_q).toInt();
 }
 
 void SaveWidth(int width) {
-	auto object = QJsonObject();
-	object.insert(u"panel_width"_q, width);
-	auto file = QFile(StatePath());
-	if (file.open(QIODevice::WriteOnly)) {
-		file.write(QJsonDocument(object).toJson(QJsonDocument::Compact));
+	SaveState(u"panel_width"_q, width);
+}
+
+[[nodiscard]] QString AccountKey(not_null<Main::Session*> session) {
+	return QString::number(session->userId().bare);
+}
+
+[[nodiscard]] std::vector<MenuItem> ParseMenu(const QJsonArray &items) {
+	auto result = std::vector<MenuItem>();
+	for (const auto &value : items) {
+		const auto object = value.toObject();
+		const auto id = object.value(u"id"_q).toString().trimmed();
+		const auto label = object.value(u"label"_q).toString().trimmed();
+		if (id.isEmpty()
+			|| label.isEmpty()
+			|| id.size() > kMenuTextLimit
+			|| label.size() > kMenuTextLimit) {
+			continue;
+		}
+		result.push_back({ .id = id, .label = label });
+		if (result.size() == kMenuLimit) {
+			break;
+		}
 	}
+	return result;
+}
+
+[[nodiscard]] std::vector<MenuItem> SavedMenu(
+		not_null<Main::Session*> session) {
+	const auto menu = State().value(u"menu"_q).toObject();
+	return ParseMenu(menu.value(AccountKey(session)).toArray());
+}
+
+void SaveMenu(
+		not_null<Main::Session*> session,
+		const std::vector<MenuItem> &items) {
+	auto list = QJsonArray();
+	for (const auto &item : items) {
+		auto object = QJsonObject();
+		object.insert(u"id"_q, item.id);
+		object.insert(u"label"_q, item.label);
+		list.push_back(object);
+	}
+	auto menu = State().value(u"menu"_q).toObject();
+	menu.insert(AccountKey(session), list);
+	SaveState(u"menu"_q, menu);
 }
 
 [[nodiscard]] Webview::StorageId PanelStorageId() {
@@ -109,24 +178,17 @@ void SaveWidth(int width) {
 	return { .path = path, .token = token };
 }
 
-// Page API:
-//   Telegator.chat, .onchat(chat) - the open chat, chat.peer.key tells it;
-//   Telegator.quickReplies, .onquickreplies(list) - account quick replies;
-//   Telegator.theme, .ontheme(theme) - app theme colors for CSS;
-//   Telegator.insertText(text, chatKey) - puts text into the message field
-//     only while chat.peer.key == chatKey is the open chat: take the key
-//     when the request starts, so that a late answer never goes elsewhere;
-//   Telegator.useQuickReply(id) - inserts or sends a quick reply into the
-//     chat the page shows now, nothing if another chat was opened since.
+// WHY: the page lives on the owner's server and changes without a client
+// update, so the page API is a versioned contract kept in the ROADMAP.
 [[nodiscard]] QByteArray BridgeScript() {
-	return R"JS(
+	return QByteArray(R"JS(
 window.Telegator = {
+	version: { app: '%APP%', bridge: %BRIDGE% },
 	chat: null,
 	onchat: null,
-	quickReplies: [],
-	onquickreplies: null,
 	theme: null,
 	ontheme: null,
+	onmenu: null,
 	send: function (message) {
 		if (window.external && window.external.invoke) {
 			window.external.invoke(JSON.stringify(message));
@@ -143,19 +205,29 @@ window.Telegator = {
 			chat: String(chatKey)
 		});
 	},
-	useQuickReply: function (id) {
-		var chat = this.chat && this.chat.peer;
-		if (!chat) {
+	setMenu: function (items) {
+		if (!Array.isArray(items)) {
+			console.warn('Telegator.setMenu needs [{ id, label }]');
 			return;
 		}
 		this.send({
-			event: 'use_quick_reply',
-			id: String(id),
-			chat: String(chat.key)
+			event: 'set_menu',
+			items: items.map(function (item) {
+				return {
+					id: (item && item.id != null) ? String(item.id) : '',
+					label: (item && item.label != null) ? String(item.label) : ''
+				};
+			})
 		});
+	},
+	open: function () {
+		this.send({ event: 'open' });
 	},
 	_set: function (field, callback, value) {
 		this[field] = value;
+		this._fire(callback, value);
+	},
+	_fire: function (callback, value) {
 		if (typeof this[callback] === 'function') {
 			this[callback](value);
 		}
@@ -164,76 +236,9 @@ window.Telegator = {
 document.addEventListener('DOMContentLoaded', function () {
 	window.Telegator.send({ event: 'ready' });
 });
-)JS";
-}
-
-// Shown when telegator.json has no panel url: the quick replies.
-[[nodiscard]] QString QuickActionsPage() {
-	return uR"HTML(<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>
-:root { --bg: #ffffff; --fg: #000000; --sub: #8a8a8a; --over: #f1f1f1; }
-body { font: 14px -apple-system, 'Segoe UI', sans-serif; margin: 0;
-	padding: 12px; background: var(--bg); color: var(--fg); }
-h3 { margin: 4px 0 2px; font-size: 15px; }
-#chat { color: var(--sub); font-size: 12px; margin-bottom: 12px; }
-.reply { display: block; width: 100%; text-align: left; border: 0;
-	border-radius: 8px; padding: 8px 10px; margin: 0 0 6px;
-	background: var(--over); color: var(--fg); font: inherit;
-	cursor: pointer; }
-.reply:active { opacity: .7; }
-.name { font-weight: 600; }
-.preview { color: var(--sub); font-size: 12px; margin-top: 2px;
-	overflow-wrap: anywhere; }
-.empty { color: var(--sub); font-size: 13px; line-height: 1.4; }
-</style></head>
-<body>
-<h3>Быстрые действия</h3>
-<div id="chat"></div>
-<div id="list"></div>
-<script>
-function render(replies) {
-	var list = document.getElementById('list');
-	list.textContent = '';
-	if (!replies || !replies.length) {
-		var empty = document.createElement('div');
-		empty.className = 'empty';
-		empty.textContent = 'Заготовок пока нет. Добавьте их в телефоне: '
-			+ 'Настройки → Telegram для бизнеса → Быстрые ответы.';
-		list.appendChild(empty);
-		return;
-	}
-	replies.forEach(function (reply) {
-		var button = document.createElement('button');
-		button.className = 'reply';
-		var name = document.createElement('div');
-		name.className = 'name';
-		name.textContent = reply.name;
-		var preview = document.createElement('div');
-		preview.className = 'preview';
-		preview.textContent = reply.preview || '…';
-		button.appendChild(name);
-		button.appendChild(preview);
-		button.onclick = function () {
-			Telegator.useQuickReply(reply.id);
-		};
-		list.appendChild(button);
-	});
-}
-Telegator.onquickreplies = render;
-Telegator.onchat = function (chat) {
-	document.getElementById('chat').textContent = (chat && chat.peer)
-		? chat.peer.name
-		: 'Чат не выбран';
-};
-Telegator.ontheme = function (theme) {
-	for (var key in theme) {
-		document.documentElement.style.setProperty('--' + key, theme[key]);
-	}
-};
-render(Telegator.quickReplies);
-</script>
-</body></html>)HTML"_q;
+)JS").replace("%APP%", AppVersionStr).replace(
+		"%BRIDGE%",
+		QByteArray::number(kBridgeVersion));
 }
 
 [[nodiscard]] QString CssColor(const style::color &color) {
@@ -257,12 +262,10 @@ render(Telegator.quickReplies);
 }
 
 [[nodiscard]] QJsonObject ChatObject(
-		not_null<Window::SessionController*> controller) {
+		not_null<Main::Session*> session,
+		PeerData *peer) {
 	auto result = QJsonObject();
-	result.insert(
-		u"account_id"_q,
-		QString::number(controller->session().userId().bare));
-	const auto peer = controller->activeChatCurrent().peer();
+	result.insert(u"account_id"_q, AccountKey(session));
 	if (!peer) {
 		return result;
 	}
@@ -285,6 +288,48 @@ render(Telegator.quickReplies);
 	chat.insert(u"username"_q, peer->username());
 	result.insert(u"peer"_q, chat);
 	return result;
+}
+
+// Self-destructing content never leaves the app.
+[[nodiscard]] bool MenuAllowed(not_null<HistoryItem*> item) {
+	const auto media = item->media();
+	return !item->isService()
+		&& !item->isEphemeral()
+		&& !(media && media->ttlSeconds())
+		&& !item->originalText().text.isEmpty()
+		&& !item->history()->isForum();
+}
+
+[[nodiscard]] QJsonObject MessageObject(not_null<HistoryItem*> item) {
+	auto result = QJsonObject();
+	result.insert(u"id"_q, QString::number(item->id.bare));
+	result.insert(u"text"_q, item->originalText().text);
+	result.insert(u"out"_q, item->out());
+	result.insert(u"forwarded"_q, item->Has<HistoryMessageForwarded>());
+	result.insert(u"date"_q, item->date());
+	return result;
+}
+
+void ChooseMenu(
+		not_null<Window::SessionController*> controller,
+		FullMsgId itemId,
+		const QString &id) {
+	const auto i = Panels().find(controller);
+	const auto item = controller->session().data().message(itemId);
+	if (i == end(Panels()) || !item || !MenuAllowed(item)) {
+		return;
+	}
+	const auto peer = item->history()->peer;
+	if (peer.get() != controller->activeChatCurrent().peer()) {
+		controller->showToast(u"Не выполнено: открыт другой чат."_q);
+		return;
+	}
+	auto event = QJsonObject();
+	event.insert(u"item"_q, id);
+	event.insert(u"chat"_q, ChatObject(&controller->session(), peer));
+	event.insert(u"message"_q, MessageObject(item));
+	i->second->chooseMenu(
+		QJsonDocument(event).toJson(QJsonDocument::Compact));
 }
 
 // Looks like the other buttons of its place.
@@ -379,11 +424,11 @@ bool InsertIntoChat(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer,
 		TextWithTags text) {
-	const auto i = Histories().find(controller);
-	if (i == end(Histories())) {
+	const auto i = Panels().find(controller);
+	if (i == end(Panels())) {
 		return false;
 	}
-	const auto history = i->second;
+	const auto history = i->second->history();
 	const auto field = history->telegatorField();
 	// History widget is hidden while another section (a topic) is shown.
 	if (history->isHidden()
@@ -394,6 +439,26 @@ bool InsertIntoChat(
 	InsertAtCursor(field, std::move(text));
 	field->setFocus();
 	return true;
+}
+
+void AddMessageActions(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<Window::SessionController*> controller,
+		HistoryItem *item) {
+	const auto session = &controller->session();
+	if (!item
+		|| !MenuAllowed(item)
+		|| !PanelAllowed(session)
+		|| Panel().url.isEmpty()
+		|| !Panels().contains(controller)) {
+		return;
+	}
+	const auto itemId = item->fullId();
+	for (const auto &entry : SavedMenu(session)) {
+		menu->addAction(entry.label, [=, id = entry.id] {
+			ChooseMenu(controller, itemId, id);
+		}, &st::menuIconManage);
+	}
 }
 
 PanelToggle::PanelToggle(
@@ -430,9 +495,8 @@ SidePanel::SidePanel(
 	if (!_allowed) {
 		return;
 	}
-	Histories().remove(controller);
-	Histories().emplace(controller, history);
-	_quickReplies = std::make_unique<QuickReplies>(&controller->session());
+	Panels().remove(controller);
+	Panels().emplace(controller, this);
 	_width = ReadSavedWidth();
 	if (_width <= 0) {
 		_width = style::ConvertScale(kPanelWidth);
@@ -451,7 +515,7 @@ SidePanel::SidePanel(
 		if (shown) {
 			// The panel takes the place of the profile column.
 			controller->closeThirdSection();
-			if (!_webview) {
+			if (!std::exchange(_created, true)) {
 				createWebview();
 			}
 		}
@@ -463,10 +527,6 @@ SidePanel::SidePanel(
 		sendChat();
 	}, _body->lifetime());
 
-	_quickReplies->changes() | rpl::on_next([=] {
-		sendQuickReplies();
-	}, _body->lifetime());
-
 	style::PaletteChanged(
 	) | rpl::on_next([=] {
 		sendTheme();
@@ -474,10 +534,20 @@ SidePanel::SidePanel(
 }
 
 SidePanel::~SidePanel() {
-	const auto i = Histories().find(_controller);
-	if (i != end(Histories()) && i->second == _history) {
-		Histories().erase(i);
+	const auto i = Panels().find(_controller);
+	if (i != end(Panels()) && i->second.get() == this) {
+		Panels().erase(i);
 	}
+}
+
+not_null<HistoryWidget*> SidePanel::history() const {
+	return _history;
+}
+
+void SidePanel::chooseMenu(QByteArray event) {
+	_menuEvent = std::move(event);
+	Shown(_controller) = true;
+	sendMenuEvent();
 }
 
 int SidePanel::layout(int left, int top, int right, int bottom) {
@@ -556,28 +626,23 @@ void SidePanel::setupResize() {
 }
 
 void SidePanel::createWebview() {
+	const auto url = Panel().url;
+	if (url.isEmpty()) {
+		showNotice(u"Панель не настроена."_q);
+		return;
+	}
 	_webview = std::make_unique<Webview::Window>(
 		_body.get(),
 		Webview::WindowConfig{
 			.opaqueBg = st::windowBg->c,
 			.storageId = PanelStorageId(),
-			// Only the owner's page or the built-in one is ever shown here,
-			// the fraud check of WebKit flags the built-in page otherwise.
 			.safe = true,
 		});
 	const auto raw = _webview.get();
 	if (!raw->widget()) {
 		LOG(("Telegator: panel webview is not available."));
 		_webview = nullptr;
-		const auto label = Ui::CreateChild<Ui::FlatLabel>(
-			_body.get(),
-			u"Built-in browser is not available."_q);
-		_body->sizeValue() | rpl::on_next([=](QSize size) {
-			const auto skip = style::ConvertScale(16);
-			label->resizeToWidth(size.width() - 2 * skip);
-			label->moveToLeft(skip, skip);
-		}, label->lifetime());
-		label->show();
+		showNotice(u"Встроенный браузер недоступен."_q);
 		return;
 	}
 	raw->widget()->show();
@@ -592,10 +657,7 @@ void SidePanel::createWebview() {
 		LOG(("Telegator: panel page %1."
 			).arg(success ? "loaded" : "failed to load"));
 		if (success) {
-			_pageReady = true;
-			sendTheme();
-			sendChat();
-			sendQuickReplies();
+			pageReady();
 		}
 	});
 	raw->setMessageHandler([=](const QJsonDocument &message) {
@@ -603,34 +665,23 @@ void SidePanel::createWebview() {
 			handleMessage(message);
 		});
 	});
-	raw->setDataRequestHandler([=](Webview::DataRequest request) {
-		if (!request.id.starts_with("telegator/quick.html")) {
-			return Webview::DataResult::Failed;
-		}
-		request.done({
-			.stream = std::make_unique<Webview::DataStreamFromMemory>(
-				QuickActionsPage().toUtf8(),
-				"text/html; charset=utf-8"),
-		});
-		return Webview::DataResult::Done;
-	});
 	raw->init(BridgeScript());
-	if (const auto url = Panel().url; !url.isEmpty()) {
-		raw->navigate(url);
-	} else {
-		raw->navigateToData(u"telegator/quick.html"_q);
-	}
+	raw->navigate(url);
+}
+
+void SidePanel::showNotice(const QString &text) {
+	const auto label = Ui::CreateChild<Ui::FlatLabel>(_body.get(), text);
+	_body->sizeValue() | rpl::on_next([=](QSize size) {
+		const auto skip = style::ConvertScale(16);
+		label->resizeToWidth(size.width() - 2 * skip);
+		label->moveToLeft(skip, skip);
+	}, label->lifetime());
+	label->show();
 }
 
 bool SidePanel::allowedNavigation(const QString &uri) const {
-	const auto url = Panel().url;
-	if (url.isEmpty()) {
-		// Built-in page is served by lib_webview's data domain (mac, windows).
-		return uri.startsWith(u"desktopappresource://"_q)
-			|| uri.startsWith(u"http://desktop-app-resource/"_q);
-	}
 	const auto target = QUrl(uri);
-	const auto base = QUrl(url);
+	const auto base = QUrl(Panel().url);
 	return (target.scheme() == base.scheme())
 		&& (target.host() == base.host())
 		&& (target.port() == base.port());
@@ -640,11 +691,14 @@ void SidePanel::handleMessage(const QJsonDocument &message) {
 	const auto object = message.object();
 	const auto event = object.value(u"event"_q).toString();
 	if (event == u"ready"_q) {
-		_pageReady = true;
-		sendTheme();
-		sendChat();
-		sendQuickReplies();
-	} else if (event == u"insert_text"_q || event == u"use_quick_reply"_q) {
+		pageReady();
+	} else if (event == u"set_menu"_q) {
+		SaveMenu(
+			&_controller->session(),
+			ParseMenu(object.value(u"items"_q).toArray()));
+	} else if (event == u"open"_q) {
+		Shown(_controller) = true;
+	} else if (event == u"insert_text"_q) {
 		// The chat the page meant must still be the open one.
 		const auto chat = object.value(u"chat"_q).toString();
 		const auto peer = _controller->activeChatCurrent().peer();
@@ -652,12 +706,6 @@ void SidePanel::handleMessage(const QJsonDocument &message) {
 			return;
 		} else if (chat != QString::number(peer->id.value)) {
 			_controller->showToast(u"Не выполнено: открыт другой чат."_q);
-			return;
-		} else if (event == u"use_quick_reply"_q) {
-			const auto id = object.value(u"id"_q).toString().toInt();
-			if (id) {
-				_quickReplies->use(id, _controller, peer);
-			}
 			return;
 		}
 		const auto text = object.value(u"text"_q).toString();
@@ -667,6 +715,13 @@ void SidePanel::handleMessage(const QJsonDocument &message) {
 	}
 }
 
+void SidePanel::pageReady() {
+	_pageReady = true;
+	sendTheme();
+	sendChat();
+	sendMenuEvent();
+}
+
 void SidePanel::eval(const QByteArray &script) {
 	if (_webview && _pageReady) {
 		_webview->eval(script);
@@ -674,25 +729,12 @@ void SidePanel::eval(const QByteArray &script) {
 }
 
 void SidePanel::sendChat() {
-	const auto json = QJsonDocument(ChatObject(_controller)).toJson(
-		QJsonDocument::Compact);
+	const auto json = QJsonDocument(ChatObject(
+		&_controller->session(),
+		_controller->activeChatCurrent().peer())).toJson(
+			QJsonDocument::Compact);
 	eval("window.Telegator && window.Telegator._set("
 		"'chat', 'onchat', " + json + ");");
-}
-
-void SidePanel::sendQuickReplies() {
-	auto list = QJsonArray();
-	for (const auto &reply : _quickReplies->list()) {
-		auto object = QJsonObject();
-		object.insert(u"id"_q, QString::number(reply.id));
-		object.insert(u"name"_q, reply.name);
-		object.insert(u"count"_q, reply.count);
-		object.insert(u"preview"_q, reply.preview);
-		list.push_back(object);
-	}
-	const auto json = QJsonDocument(list).toJson(QJsonDocument::Compact);
-	eval("window.Telegator && window.Telegator._set("
-		"'quickReplies', 'onquickreplies', " + json + ");");
 }
 
 void SidePanel::sendTheme() {
@@ -700,6 +742,14 @@ void SidePanel::sendTheme() {
 		QJsonDocument::Compact);
 	eval("window.Telegator && window.Telegator._set("
 		"'theme', 'ontheme', " + json + ");");
+}
+
+void SidePanel::sendMenuEvent() {
+	if (_menuEvent && _webview && _pageReady) {
+		eval("window.Telegator && window.Telegator._fire('onmenu', "
+			+ *base::take(_menuEvent)
+			+ ");");
+	}
 }
 
 } // namespace Telegator
