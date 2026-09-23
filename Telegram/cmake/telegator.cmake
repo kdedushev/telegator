@@ -16,6 +16,8 @@ PRIVATE
     telegator/telegator_panel.h
     telegator/telegator_quick_replies.cpp
     telegator/telegator_quick_replies.h
+    telegator/telegator_requisites.cpp
+    telegator/telegator_requisites.h
     telegator/telegator_requisites_format.cpp
     telegator/telegator_requisites_format.h
 )
