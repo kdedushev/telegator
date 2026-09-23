@@ -7,12 +7,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "telegator/telegator_quick_replies.h"
 
 #include "apiwrap.h"
+#include "core/ui_integration.h"
 #include "data/business/data_shortcut_messages.h"
 #include "data/data_media_types.h"
 #include "data/data_session.h"
 #include "history/history_item.h"
 #include "main/main_session.h"
 #include "telegator/telegator_panel.h"
+#include "ui/text/text.h"
+#include "ui/text/text_utilities.h"
+#include "styles/style_basic.h"
 #include "window/window_session_controller.h"
 
 namespace Telegator {
@@ -24,6 +28,38 @@ constexpr auto kPreviewLength = 80;
 	const auto media = item->media();
 	return !item->originalText().text.isEmpty()
 		&& (!media || media->webpage());
+}
+
+[[nodiscard]] HistoryItem *FirstMessage(
+		not_null<Main::Session*> session,
+		BusinessShortcutId id) {
+	const auto slice = session->data().shortcutMessages().list(id);
+	return slice.ids.empty()
+		? nullptr
+		: session->data().message(slice.ids.front());
+}
+
+// One line of text with premium emoji only, other formatting dropped.
+[[nodiscard]] TextWithEntities PreviewText(not_null<HistoryItem*> item) {
+	auto result = item->originalText();
+	if (result.text.isEmpty()) {
+		return { u"(медиа)"_q };
+	}
+	result.entities.erase(
+		ranges::remove_if(result.entities, [](const EntityInText &entity) {
+			return (entity.type() != EntityType::CustomEmoji);
+		}),
+		result.entities.end());
+	result.text.replace(QChar('\n'), QChar(' '));
+	if (result.text.size() > kPreviewLength) {
+		auto length = kPreviewLength - 1;
+		if (result.text[length - 1].isHighSurrogate()) {
+			--length;
+		}
+		result = Ui::Text::Mid(result, 0, length);
+		result.text.append(QChar(0x2026));
+	}
+	return result;
 }
 
 } // namespace
@@ -42,21 +78,24 @@ std::vector<Data::Shortcut> OrderedShortcuts(
 QString ShortcutPreview(
 		not_null<Main::Session*> session,
 		BusinessShortcutId id) {
-	const auto slice = session->data().shortcutMessages().list(id);
-	if (slice.ids.empty()) {
-		return QString();
-	}
-	const auto item = session->data().message(slice.ids.front());
-	if (!item) {
-		return QString();
-	}
-	auto result = item->originalText().text;
-	if (result.isEmpty()) {
-		return u"(медиа)"_q;
-	}
-	result.replace(QChar('\n'), QChar(' '));
-	if (result.size() > kPreviewLength) {
-		result = result.left(kPreviewLength - 1) + QChar(0x2026);
+	const auto item = FirstMessage(session, id);
+	return item ? PreviewText(item).text : QString();
+}
+
+Ui::Text::String ShortcutPreviewText(
+		not_null<Main::Session*> session,
+		BusinessShortcutId id,
+		Fn<void()> repaint) {
+	auto result = Ui::Text::String();
+	if (const auto item = FirstMessage(session, id)) {
+		result.setMarkedText(
+			st::defaultTextStyle,
+			PreviewText(item),
+			kMarkupTextOptions,
+			Core::TextContext({
+				.session = session,
+				.repaint = std::move(repaint),
+			}));
 	}
 	return result;
 }

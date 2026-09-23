@@ -797,6 +797,10 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 							lt_count,
 							shortcut.count),
 					.userpic = self->activeUserpicView(),
+					.descriptionText = Telegator::ShortcutPreviewText( // Telegator
+						&_user->session(),
+						shortcut.id,
+						[=] { if (_inner) _inner->update(); }),
 				});
 			}
 			if (!brows.empty()) {

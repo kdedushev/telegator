@@ -20,6 +20,10 @@ namespace Data {
 struct Shortcut;
 } // namespace Data
 
+namespace Ui::Text {
+class String;
+} // namespace Ui::Text
+
 namespace Telegator {
 
 struct QuickReply {
@@ -38,6 +42,13 @@ struct QuickReply {
 [[nodiscard]] QString ShortcutPreview(
 	not_null<Main::Session*> session,
 	BusinessShortcutId id);
+
+// The same preview with premium emoji, for the list after "/".
+// Empty until the messages load.
+[[nodiscard]] Ui::Text::String ShortcutPreviewText(
+	not_null<Main::Session*> session,
+	BusinessShortcutId id,
+	Fn<void()> repaint);
 
 // Business quick replies of the account ("заготовки"), edited on the phone
 // in Settings > Telegram Business > Quick Replies and synced everywhere.
