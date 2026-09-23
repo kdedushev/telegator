@@ -136,6 +136,34 @@ git rebase <новый тег или upstream/dev>
 - Выполнять рабочие действия в клиенте: кнопка сообщает серверу владельца
   «нажали X в чате Y», решает и исполняет сервер.
 
+Исключение из двух правил выше — «Реквизиты» (владелец 23.09.2026): правила
+оформления, справочник банков, отправка и закреп — в самом клиенте.
+
+## «Реквизиты»
+
+Пункт меню сообщения — `telegator_requisites.*`, оформление —
+`telegator_requisites_format.*`: перенос модуля админки
+`tokenator-admin/src/apps/requisites` (там правила владельца и их тесты).
+Поменять правила: сначала модуль и его тесты, затем эталоны, затем перенос
+в C++, пока проверка не станет зелёной:
+
+```bash
+cd ~/Projects/tokenator/tokenator-admin
+PYTHONPATH=src .venv/bin/python ~/.tokenator-konveyer/rekvizity-telegator/export_vectors.py
+cd ~/Projects/telegator-wt/dev/Telegram
+nice -n 10 cmake --build ../out --config Debug --target test_telegator_requisites
+../out/Debug/test_telegator_requisites ~/.tokenator-konveyer/rekvizity-telegator/vectors.json
+```
+
+- Эталоны (`vectors.json`, «вход → ответ модуля», сравнение байт в байт,
+  `entities` в единицах UTF-16) лежат вне репозитория: он публичный, а в
+  тестах модуля — примеры владельца.
+- Встроенные проверки теста — на выдуманных номерах: цифры не искажаются,
+  пересланное — отказ, своё — правка, два телефона — выбор.
+- Регулярные выражения модуля перенесены дословно; `\w \d \s \b` в
+  `PyPattern()` переводятся в классы Python (сверено по всем символам
+  Unicode 15.1, как у Python 3.13 модуля).
+
 ## Гигиена — чтобы не копился мусор
 
 - **Сборка — в постоянном worktree `~/Projects/telegator-wt/dev`**: в нём `out/`
