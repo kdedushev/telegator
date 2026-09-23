@@ -110,7 +110,7 @@ void PinWhenSent(not_null<Main::Session*> session, FullMsgId localId) {
 	i->second->localIds.emplace(localId);
 }
 
-void SendRequisites(
+bool SendRequisites(
 		not_null<Window::SessionController*> controller,
 		not_null<History*> history,
 		const TextWithEntities &text,
@@ -118,7 +118,7 @@ void SendRequisites(
 	const auto error = SendError(history);
 	if (!error.isEmpty()) {
 		controller->showToast(error);
-		return;
+		return false;
 	}
 	auto action = Api::SendAction(history, { .silent = true });
 	action.clearDraft = false;
@@ -132,6 +132,7 @@ void SendRequisites(
 	if (pin && history->owner().message(history->peer, localId)) {
 		PinWhenSent(&history->session(), { history->peer->id, localId });
 	}
+	return true;
 }
 
 void EditRequisites(
@@ -139,7 +140,8 @@ void EditRequisites(
 		not_null<HistoryItem*> item,
 		const TextWithEntities &text,
 		bool pin) {
-	const auto session = &item->history()->session();
+	const auto history = item->history();
+	const auto session = &history->session();
 	const auto itemId = item->fullId();
 	const auto edited = [=] {
 		const auto current = session->data().message(itemId);
@@ -158,8 +160,12 @@ void EditRequisites(
 		crl::guard(session, [=](const QString &error, mtpRequestId) {
 			if (error == u"MESSAGE_NOT_MODIFIED"_q) {
 				edited();
-			} else if (const auto strong = weak.get()) {
-				strong->showToast(u"Не получилось изменить сообщение."_q);
+				return;
+			}
+			const auto strong = weak.get();
+			if (strong && SendRequisites(strong, history, text, pin)) {
+				strong->showToast(u"Своё сообщение изменить не вышло — "
+					"реквизиты отправлены новым сообщением."_q);
 			}
 		}),
 		media && media->hasSpoiler());
@@ -178,11 +184,6 @@ void RequisitesBox(
 	if (history && pin && !history->peer->canPinMessages()) {
 		pin = false;
 		warnings.push_back(u"Закрепить в этом чате нельзя."_q);
-	}
-	if (edit && !(item && item->allowsEdit(base::unixtime::now()))) {
-		edit = false;
-		warnings.push_back(u"Своё сообщение уже не изменить — реквизиты "
-			"уйдут новым сообщением."_q);
 	}
 	const auto weak = base::make_weak(history);
 	const auto sent = box->lifetime().make_state<bool>(false);
@@ -217,26 +218,14 @@ void RequisitesBox(
 	}
 }
 
-[[nodiscard]] std::optional<Prepared> Prepare(
-		not_null<Window::SessionController*> controller,
-		const Requisites::Variant &variant) {
+[[nodiscard]] Prepared Prepare(const Requisites::Variant &variant) {
 	auto text = TextWithEntities{ variant.text };
 	for (const auto &span : variant.code) {
 		text.entities.push_back(
 			EntityInText(EntityType::Code, span.offset, span.length));
 	}
 	TextUtilities::PrepareForSending(text, 0);
-	const auto limit = Data::PremiumLimits(
-		&controller->session()).messageLengthCurrent();
-	if (text.text.isEmpty()) {
-		controller->showToast(u"«Реквизиты» не нашли, что отправить."_q);
-		return std::nullopt;
-	} else if (text.text.size() > limit) {
-		controller->showToast(
-			u"Реквизиты не помещаются в одно сообщение."_q);
-		return std::nullopt;
-	}
-	return Prepared{ std::move(text), variant.title.trimmed() };
+	return { std::move(text), variant.title.trimmed() };
 }
 
 void Confirm(
@@ -244,20 +233,49 @@ void Confirm(
 		FullMsgId itemId,
 		const Requisites::Variant &variant,
 		const Requisites::Result &result) {
-	if (!controller->session().data().message(itemId)) {
+	const auto item = controller->session().data().message(itemId);
+	if (!item) {
 		return;
 	}
-	auto prepared = Prepare(controller, variant);
-	if (!prepared) {
+	auto prepared = Prepare(variant);
+	const auto length = int(prepared.text.text.size());
+	if (!length) {
+		controller->showToast(u"«Реквизиты» не нашли, что отправить."_q);
+		return;
+	}
+	const auto limits = Data::PremiumLimits(&controller->session());
+	const auto media = item->media();
+	const auto caption = media && media->allowsEditCaption();
+	auto warnings = result.warnings;
+	auto edit = result.edit;
+	if (edit && !item->allowsEdit(base::unixtime::now())) {
+		edit = false;
+		warnings.push_back(u"Своё сообщение уже не изменить — реквизиты "
+			"уйдут новым сообщением."_q);
+	} else if (edit && caption && length > limits.captionLengthCurrent()) {
+		edit = false;
+		warnings.push_back(u"В подпись реквизиты не помещаются — уйдут "
+			"новым сообщением."_q);
+	}
+	if (!edit) {
+		const auto error = SendError(item->history());
+		if (!error.isEmpty()) {
+			controller->showToast(error);
+			return;
+		}
+	}
+	if (length > limits.messageLengthCurrent()) {
+		controller->showToast(
+			u"Реквизиты не помещаются в одно сообщение."_q);
 		return;
 	}
 	controller->show(Box(
 		RequisitesBox,
 		controller,
 		itemId,
-		std::move(*prepared),
-		result.warnings,
-		result.edit,
+		std::move(prepared),
+		warnings,
+		edit,
 		result.pin));
 }
 
