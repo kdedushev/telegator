@@ -87,7 +87,11 @@ Ui::Text::String ShortcutPreviewText(
 		BusinessShortcutId id,
 		Fn<void()> repaint) {
 	auto result = Ui::Text::String();
-	if (const auto item = FirstMessage(session, id)) {
+	const auto item = FirstMessage(session, id);
+	if (!item) {
+		// Starts the load again if it failed or never started.
+		(void)session->data().shortcutMessages().updates(id);
+	} else {
 		result.setMarkedText(
 			st::defaultTextStyle,
 			PreviewText(item),
@@ -98,6 +102,14 @@ Ui::Text::String ShortcutPreviewText(
 			}));
 	}
 	return result;
+}
+
+void WatchQuickReplies(
+		not_null<Main::Session*> session,
+		Fn<void()> callback,
+		rpl::lifetime &lifetime) {
+	const auto replies = lifetime.make_state<QuickReplies>(session);
+	replies->changes() | rpl::on_next(std::move(callback), lifetime);
 }
 
 QuickReplies::QuickReplies(not_null<Main::Session*> session)

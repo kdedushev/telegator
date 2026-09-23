@@ -2164,6 +2164,10 @@ void InitFieldAutocomplete(
 	if (shortcutMessages) {
 		shortcutMessages->shortcutsChanged(
 		) | rpl::on_next(check, raw->lifetime());
+		Telegator::WatchQuickReplies( // Telegator
+			&peer->session(),
+			check,
+			raw->lifetime());
 	}
 
 	raw->setSendMenuDetails(std::move(descriptor.sendMenuDetails));

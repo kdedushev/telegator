@@ -50,6 +50,13 @@ struct QuickReply {
 	BusinessShortcutId id,
 	Fn<void()> repaint);
 
+// Calls callback whenever quick replies or their messages change, so the
+// list after "/" gets the texts once they load.
+void WatchQuickReplies(
+	not_null<Main::Session*> session,
+	Fn<void()> callback,
+	rpl::lifetime &lifetime);
+
 // Business quick replies of the account ("заготовки"), edited on the phone
 // in Settings > Telegram Business > Quick Replies and synced everywhere.
 // The side panel shows them as buttons.
