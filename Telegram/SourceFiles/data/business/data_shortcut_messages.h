@@ -26,6 +26,7 @@ struct Shortcut {
 	int count = 0;
 	QString name;
 	MsgId topMessageId = 0;
+	int order = 0; // Telegator: position in the list from the server.
 
 	friend inline bool operator==(
 		const Shortcut &a,

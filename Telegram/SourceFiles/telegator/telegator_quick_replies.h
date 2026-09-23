@@ -16,6 +16,10 @@ namespace Window {
 class SessionController;
 } // namespace Window
 
+namespace Data {
+struct Shortcut;
+} // namespace Data
+
 namespace Telegator {
 
 struct QuickReply {
@@ -24,6 +28,16 @@ struct QuickReply {
 	int count = 0;
 	QString preview; // Text of the first message, empty until it is loaded.
 };
+
+// Quick replies in the order set on the phone, the way Telegram shows them
+// on iPhone and Android. Desktop Telegram sorts them by id instead.
+[[nodiscard]] std::vector<Data::Shortcut> OrderedShortcuts(
+	not_null<Main::Session*> session);
+
+// Text of the first message in one line, empty until the messages load.
+[[nodiscard]] QString ShortcutPreview(
+	not_null<Main::Session*> session,
+	BusinessShortcutId id);
 
 // Business quick replies of the account ("заготовки"), edited on the phone
 // in Settings > Telegram Business > Quick Replies and synced everywhere.

@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "data/business/data_shortcut_messages.h"
+#include "telegator/telegator_quick_replies.h" // Telegator
 #include "data/components/recent_inline_bots.h"
 #include "data/components/top_peers.h"
 #include "data/stickers/data_stickers.h"
@@ -772,24 +773,29 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 			}
 		}
 		const auto shortcuts = (_user && !_user->isBot())
-			? _user->owner().shortcutMessages().shortcuts().list
-			: base::flat_map<BusinessShortcutId, Data::Shortcut>();
+			? Telegator::OrderedShortcuts(&_user->session()) // Telegator
+			: std::vector<Data::Shortcut>();
 		if (!hasUsername && brows.empty() && !shortcuts.empty()) {
 			const auto self = _user->session().user();
-			for (const auto &[id, shortcut] : shortcuts) {
+			for (const auto &shortcut : shortcuts) {
 				const auto &name = shortcut.name;
 				if (shortcut.count < 1
 					|| (!listAllSuggestions
 						&& !name.startsWith(_filter, Qt::CaseInsensitive))) {
 					continue;
 				}
+				const auto preview = Telegator::ShortcutPreview( // Telegator
+					&_user->session(),
+					shortcut.id);
 				brows.push_back({
 					.user = self,
 					.command = name,
-					.description = tr::lng_forum_messages(
-						tr::now,
-						lt_count,
-						shortcut.count),
+					.description = !preview.isEmpty() // Telegator
+						? preview
+						: tr::lng_forum_messages(
+							tr::now,
+							lt_count,
+							shortcut.count),
 					.userpic = self->activeUserpicView(),
 				});
 			}

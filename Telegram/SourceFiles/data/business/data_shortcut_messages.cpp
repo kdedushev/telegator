@@ -219,7 +219,8 @@ Shortcuts ShortcutMessages::parseShortcuts(
 		const QVector<MTPQuickReply> &list) const {
 	auto result = Shortcuts();
 	for (const auto &reply : list) {
-		const auto shortcut = parseShortcut(reply);
+		auto shortcut = parseShortcut(reply);
+		shortcut.order = int(result.list.size()); // Telegator
 		result.list.emplace(shortcut.id, shortcut);
 	}
 	return result;
@@ -282,7 +283,7 @@ void ShortcutMessages::scheduleShortcutsReload() {
 void ShortcutMessages::apply(const MTPDupdateNewQuickReply &update) {
 	const auto &reply = update.vquick_reply();
 	auto foundId = BusinessShortcutId();
-	const auto shortcut = parseShortcut(reply);
+	auto shortcut = parseShortcut(reply);
 	for (auto &[id, existing] : _shortcuts.list) {
 		if (id == shortcut.id) {
 			foundId = id;
@@ -291,6 +292,9 @@ void ShortcutMessages::apply(const MTPDupdateNewQuickReply &update) {
 			foundId = id;
 			break;
 		}
+	}
+	if (foundId) {
+		shortcut.order = _shortcuts.list[foundId].order; // Telegator
 	}
 	if (foundId == shortcut.id) {
 		auto &already = _shortcuts.list[shortcut.id];
@@ -503,7 +507,11 @@ BusinessShortcutId ShortcutMessages::emplaceShortcut(QString name) {
 		}
 	}
 	const auto result = --_localShortcutId;
-	_shortcuts.list.emplace(result, Shortcut{ .id = result, .name = name });
+	_shortcuts.list.emplace(result, Shortcut{
+		.id = result,
+		.name = name,
+		.order = int(_shortcuts.list.size()), // Telegator
+	});
 	return result;
 }
 

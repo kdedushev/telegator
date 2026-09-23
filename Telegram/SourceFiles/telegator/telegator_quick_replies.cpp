@@ -28,6 +28,39 @@ constexpr auto kPreviewLength = 80;
 
 } // namespace
 
+std::vector<Data::Shortcut> OrderedShortcuts(
+		not_null<Main::Session*> session) {
+	auto result = session->data().shortcutMessages().shortcuts().list
+		| ranges::views::values
+		| ranges::to_vector;
+	ranges::sort(result, [](const Data::Shortcut &a, const Data::Shortcut &b) {
+		return (a.order != b.order) ? (a.order < b.order) : (a.id > b.id);
+	});
+	return result;
+}
+
+QString ShortcutPreview(
+		not_null<Main::Session*> session,
+		BusinessShortcutId id) {
+	const auto slice = session->data().shortcutMessages().list(id);
+	if (slice.ids.empty()) {
+		return QString();
+	}
+	const auto item = session->data().message(slice.ids.front());
+	if (!item) {
+		return QString();
+	}
+	auto result = item->originalText().text;
+	if (result.isEmpty()) {
+		return u"(медиа)"_q;
+	}
+	result.replace(QChar('\n'), QChar(' '));
+	if (result.size() > kPreviewLength) {
+		result = result.left(kPreviewLength - 1) + QChar(0x2026);
+	}
+	return result;
+}
+
 QuickReplies::QuickReplies(not_null<Main::Session*> session)
 : _session(session) {
 	const auto messages = &session->data().shortcutMessages();
@@ -78,29 +111,15 @@ std::vector<not_null<HistoryItem*>> QuickReplies::messages(
 
 std::vector<QuickReply> QuickReplies::list() const {
 	auto result = std::vector<QuickReply>();
-	const auto &shortcuts
-		= _session->data().shortcutMessages().shortcuts().list;
-	// The order of Settings > Telegram Business > Quick Replies.
-	for (const auto &[id, shortcut] : shortcuts | ranges::views::reverse) {
+	for (const auto &shortcut : OrderedShortcuts(_session)) {
 		if (!shortcut.count) {
 			continue;
 		}
-		const auto items = messages(id);
-		auto preview = items.empty()
-			? QString()
-			: items.front()->originalText().text;
-		if (!items.empty() && preview.isEmpty()) {
-			preview = u"(медиа)"_q;
-		}
-		preview.replace(QChar('\n'), QChar(' '));
-		if (preview.size() > kPreviewLength) {
-			preview = preview.left(kPreviewLength - 1) + QChar(0x2026);
-		}
 		result.push_back({
-			.id = id,
+			.id = shortcut.id,
 			.name = shortcut.name,
 			.count = shortcut.count,
-			.preview = preview,
+			.preview = ShortcutPreview(_session, shortcut.id),
 		});
 	}
 	return result;
