@@ -155,6 +155,60 @@ void CheckTwoPhonesGiveChoice() {
 		Describe(result));
 }
 
+[[nodiscard]] QStringList Texts(const Result &result) {
+	auto list = QStringList();
+	for (const auto &variant : result.variants) {
+		list.push_back(variant.text);
+	}
+	return list;
+}
+
+void CheckExpected(
+		const QString &name,
+		const QString &text,
+		const QStringList &expected) {
+	const auto result = Format({ .text = text });
+	Check(
+		result.error.isEmpty() && (Texts(result) == expected),
+		name,
+		Describe(result));
+}
+
+void CheckForeignLabelsDropped() {
+	const auto iban = u"GE29NB0000000101904917"_q;
+	const auto expected = u"TBC\n"_q + iban + u"\nMaria Ivanova"_q;
+	CheckExpected(
+		u"foreign labels dropped: Банк, IBAN"_q,
+		u"Банк: TBC\nIBAN: "_q + iban + u"\nMaria Ivanova"_q,
+		{ expected });
+	CheckExpected(
+		u"foreign labels dropped: Account, Name"_q,
+		u"TBC\nAccount: "_q + iban + u"\nName: Maria Ivanova"_q,
+		{ expected });
+}
+
+void CheckNamesAsWritten() {
+	CheckExpected(
+		u"two names with or give a choice"_q,
+		u"+79000000000 Сбер Мария Иванова или Анна Петрова"_q,
+		{
+			u"+79000000000\n Мария Иванова\n Сбербанк"_q,
+			u"+79000000000\n Анна Петрова\n Сбербанк"_q,
+		});
+	CheckExpected(
+		u"initial is part of the name"_q,
+		u"+79000000000 Сбер Мария И"_q,
+		{ u"+79000000000\n Мария И\n Сбербанк"_q });
+	CheckExpected(
+		u"number does not spoil the name"_q,
+		u"+79000000000 Сбер Иван Иванов 666"_q,
+		{ u"+79000000000\n Иван Иванов\n Сбербанк"_q });
+	CheckExpected(
+		u"initials kept as written"_q,
+		u"+79000000000 Сбер Иванов Д.С."_q,
+		{ u"+79000000000\n Иванов Д.С.\n Сбербанк"_q });
+}
+
 void CheckForwardedRefused() {
 	for (const auto out : { false, true }) {
 		const auto result = Format({
@@ -218,6 +272,8 @@ int main(int argc, char *argv[]) {
 	}
 	CheckDigitsKeptAsWritten();
 	CheckTwoPhonesGiveChoice();
+	CheckForeignLabelsDropped();
+	CheckNamesAsWritten();
 	CheckForwardedRefused();
 	CheckOwnMessageEdited();
 	CheckVectors(QString::fromUtf8(argv[1]));

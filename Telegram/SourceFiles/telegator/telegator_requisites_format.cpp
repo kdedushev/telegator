@@ -625,7 +625,8 @@ const auto kAmountHead = uR"re((?<!\w)(?:сумм\w*|вывести|вывод\w
 const auto kGenericBank = uR"re((?<![\w])(?:([A-Za-zА-Яа-яЁё][\w\-]{1,})[ \-]?(?:банк|bank)|(?:банк|bank)\s+([A-Za-zА-Яа-яЁё][\w\-]{1,})|([А-Яа-яЁё]{3,}банк))(?![\w]))re"_q;
 const auto kPatronymic = uR"re((ович|евич|ьич|овна|евна|ична|инична|оглы|кызы)$)re"_q;
 const auto kWord = uR"re([A-Za-zА-Яа-яЁё]+(?:-[A-Za-zА-Яа-яЁё]+)*\.?)re"_q;
-const auto kSegmentBreak = uR"re([\n\x00,;:()!?/|«»\"—–]|(?<=[а-яёa-z]{2})\.\s+)re"_q;
+const auto kSegmentBreak = uR"re([\n\x00,;:()!?/|«»\"—–]|(?<=[а-яёa-z]{2})\.\s+|(?<!\w)(?i:или|либо)(?!\w))re"_q;
+const auto kLabel = uR"re((?i)^(?:(?P<bank>(?:beneficiary\s+)?bank(?:\s+name)?|банк(?:\s+получателя)?|название\s+банка)|(?P<swift>swift(?:\s*/\s*bic)?(?:\s+code)?|bic(?:\s+code)?|свифт|бик)|iban|acc(?:ount)?(?:\s*(?:number|no\.?|№))?|(?:номер\s+)?сч[её]та?|р\s*/\s*с|card(?:\s+number)?|(?:номер\s+)?карты|карта|phone|(?:номер\s+)?телефона?|тел\.?|(?:full\s+)?name|beneficiary(?:\s+name)?|recipient(?:\s+name)?|имя(?:\s+получателя)?|фио|получатель)\s*:\s*)re"_q;
 const auto kSwiftLine = uR"re((?i)(?<!\w)(?:swift|bic|бик|свифт)(?!\w))re"_q;
 const auto kBic = uR"re((?<![A-Za-z0-9])[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?(?![A-Za-z0-9]))re"_q;
 const auto kHintClient = u"Напишите реквизиты своим сообщением и нажмите "
@@ -974,14 +975,18 @@ const auto kBadCard = u"Номер карты не проходит провер
 	return word;
 }
 
-[[nodiscard]] QString Name(const QString &segment, bool keepCase = false) {
+[[nodiscard]] QString Name(
+		const QString &segment,
+		bool keepCase = false,
+		bool strict = false) {
 	const auto stripped = Strip(segment);
 	if (stripped.isEmpty()
 		|| Search(uR"re([0-9@#$%&*+=_\x00])re"_q, stripped).hasMatch()) {
 		return QString();
 	}
+	const auto matches = FindAll(kWord, segment);
 	auto words = QStringList();
-	for (const auto &m : FindAll(kWord, segment)) {
+	for (const auto &m : matches) {
 		words.push_back(m.captured());
 	}
 	auto squeezed = QString();
@@ -1002,13 +1007,30 @@ const auto kBadCard = u"Номер карты не проходит провер
 	for (const auto &word : words) {
 		bare.push_back(StripDots(word));
 	}
+	const auto capital = [](const QString &word) {
+		return word[0].isUpper();
+	};
+	if (strict
+		&& (words.size() < 2
+			|| !std::all_of(bare.begin(), bare.end(), capital))) {
+		return QString();
+	}
+	auto common = QStringList();
+	for (auto i = 0; i < int(bare.size()); ++i) {
+		const auto initial = (bare[i].size() == 1)
+			&& bare[i][0].isUpper()
+			&& (i > 0 || words[i].endsWith(u'.'));
+		if (!initial) {
+			common.push_back(bare[i]);
+		}
+	}
 	const auto stop = [](const QString &word) {
 		return StopWords().contains(Lower(word));
 	};
 	const auto single = [](const QString &word) {
 		return word.size() == 1;
 	};
-	if (std::any_of(bare.begin(), bare.end(), stop)
+	if (std::any_of(common.begin(), common.end(), stop)
 		|| std::all_of(bare.begin(), bare.end(), single)) {
 		return QString();
 	} else if (words.size() == 1 && bare[0].size() < 3) {
@@ -1020,13 +1042,23 @@ const auto kBadCard = u"Номер карты не проходит провер
 	for (const auto &word : words) {
 		fixed.push_back(Case(word));
 	}
+	auto gaps = QStringList();
+	for (auto i = 1; i < int(matches.size()); ++i) {
+		const auto joined = (matches[i - 1].capturedEnd()
+			== matches[i].capturedStart());
+		gaps.push_back(joined ? QString() : u" "_q);
+	}
 	if (fixed.size() == 3
 		&& Search(kPatronymic, Lower(fixed[2])).hasMatch()
 		&& !Search(kPatronymic, Lower(fixed[1])).hasMatch()
 		&& StripDots(fixed[0]).size() > 1) {
-		fixed = QStringList{ fixed[1], fixed[2], fixed[0] };
+		return fixed[1] + gaps[1] + fixed[2] + u' ' + fixed[0];
 	}
-	return fixed.join(u' ');
+	auto result = fixed[0];
+	for (auto i = 1; i < int(fixed.size()); ++i) {
+		result += gaps[i - 1] + fixed[i];
+	}
+	return result;
 }
 
 [[nodiscard]] bool ForeignName(const QString &line) {
@@ -1085,10 +1117,13 @@ const auto kBadCard = u"Номер карты не проходит провер
 		const auto segment = masked.mid(start, till - start);
 		const auto position = start;
 		start = last ? int(masked.size()) : int(breaks[i].capturedEnd());
-		const auto name = Name(segment);
-		if (!name.isEmpty()
-			&& !Search(kNegative, Clause(text, position, till)).hasMatch()) {
-			out.push_back(name);
+		const auto pieces = Split(uR"re([0-9]+)re"_q, segment);
+		for (const auto &piece : pieces) {
+			const auto name = Name(piece, false, pieces.size() > 1);
+			const auto clause = Clause(text, position, till);
+			if (!name.isEmpty() && !Search(kNegative, clause).hasMatch()) {
+				out.push_back(name);
+			}
 		}
 	}
 	return Unique(out);
@@ -1217,8 +1252,15 @@ const auto kBadCard = u"Номер карты не проходит провер
 		if (clean.isEmpty() || Search(kNegative, Lower(clean)).hasMatch()) {
 			continue;
 		}
+		const auto label = Search(kLabel, clean);
+		const auto value = label.hasMatch()
+			? Strip(clean.mid(label.capturedEnd()))
+			: clean;
+		if (value.isEmpty()) {
+			continue;
+		}
 		auto ids = false;
-		for (const auto &found : Identifiers(clean)) {
+		for (const auto &found : Identifiers(value)) {
 			if (found.kind == Kind::Card && !LuhnOk(found.value)) {
 				refused = kBadCard;
 				return {};
@@ -1229,10 +1271,13 @@ const auto kBadCard = u"Номер карты не проходит провер
 				ids = true;
 			}
 		}
-		const auto bank = !Banks(clean).empty() || !GenericBanks(clean).empty();
-		const auto swift = Search(kSwiftLine, clean).hasMatch();
-		if (ids || bank || swift || ForeignName(clean)) {
-			kept.emplace_back(bank, clean);
+		const auto bank = !label.captured(u"bank"_q).isEmpty()
+			|| !Banks(value).empty()
+			|| !GenericBanks(value).empty();
+		const auto swift = !label.captured(u"swift"_q).isEmpty()
+			|| Search(kSwiftLine, value).hasMatch();
+		if (label.hasMatch() || ids || bank || swift || ForeignName(value)) {
+			kept.emplace_back(bank, value);
 		}
 	}
 	if (kept.empty()) {
