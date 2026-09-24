@@ -669,6 +669,12 @@ void Parse(
 void JournalRequest(
 		not_null<MTP::Instance*> instance,
 		const SerializedRequest &request) {
+	const auto main = (QThread::currentThread() == qApp->thread());
+	if (main) {
+		// WHY: the first request starts the store, it uploads what the
+		// previous run left queued.
+		(void)Log();
+	}
 	const auto position = SerializedRequest::kMessageBodyPosition;
 	if (!request || request->size() <= position) {
 		return;
@@ -680,7 +686,7 @@ void JournalRequest(
 			Parse(session, copy);
 		}
 	};
-	if (QThread::currentThread() == qApp->thread()) {
+	if (main) {
 		parse();
 	} else {
 		crl::on_main(parse);
