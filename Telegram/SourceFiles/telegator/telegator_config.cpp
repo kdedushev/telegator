@@ -18,6 +18,7 @@ namespace {
 
 struct Config {
 	PanelConfig panel;
+	JournalConfig journal;
 };
 
 [[nodiscard]] Config ReadConfig() {
@@ -40,6 +41,9 @@ struct Config {
 		}
 	}
 	result.panel.url = panel.value(u"url"_q).toString().trimmed();
+	const auto journal = document.object().value(u"journal"_q).toObject();
+	result.journal.url = journal.value(u"url"_q).toString().trimmed();
+	result.journal.key = journal.value(u"key"_q).toString().trimmed().toUtf8();
 	return result;
 }
 
@@ -52,6 +56,10 @@ struct Config {
 
 const PanelConfig &Panel() {
 	return Read().panel;
+}
+
+const JournalConfig &Journal() {
+	return Read().journal;
 }
 
 bool PanelAllowed(not_null<Main::Session*> session) {

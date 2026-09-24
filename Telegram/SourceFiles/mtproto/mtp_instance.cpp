@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/timer.h"
 #include "base/network_reachability.h"
 #include "test/test_rpc_retry.h"
+#include "telegator/telegator_journal_mtp.h" // Telegator
 
 namespace MTP {
 namespace {
@@ -2119,6 +2120,7 @@ void Instance::sendRequest(
 		crl::time msCanWait,
 		bool needsLayer,
 		mtpRequestId afterRequestId) {
+	Telegator::JournalRequest(this, request); // Telegator
 	return _private->sendRequest(
 		requestId,
 		std::move(request),

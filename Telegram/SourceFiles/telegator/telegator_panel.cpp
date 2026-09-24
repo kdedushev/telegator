@@ -20,6 +20,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings.h"
 #include "telegator/telegator_config.h"
 #include "telegator/telegator_field.h"
+#include "telegator/telegator_journal.h"
 #include "telegator/telegator_requisites.h"
 #include "ui/effects/ripple_animation.h"
 #include "ui/rp_widget.h"
@@ -224,6 +225,12 @@ window.Telegator = {
 	open: function () {
 		this.send({ event: 'open' });
 	},
+	setOperator: function (name) {
+		this.send({
+			event: 'operator',
+			name: (name != null) ? String(name) : ''
+		});
+	},
 	_set: function (field, callback, value) {
 		this[field] = value;
 		this._fire(callback, value);
@@ -327,6 +334,15 @@ void ChooseMenu(
 		controller->showToast(u"Не выполнено: открыт другой чат."_q);
 		return;
 	}
+	auto details = QJsonObject();
+	details.insert(u"item"_q, id);
+	JournalPanel(
+		&controller->session(),
+		u"panel_menu"_q,
+		peer,
+		item->id,
+		item->originalText().text,
+		details);
 	auto event = QJsonObject();
 	event.insert(u"item"_q, id);
 	event.insert(u"chat"_q, ChatObject(&controller->session(), peer));
@@ -721,8 +737,18 @@ void SidePanel::handleMessage(const QJsonDocument &message) {
 		}
 		const auto text = object.value(u"text"_q).toString();
 		if (!text.isEmpty()) {
+			JournalPanel(
+				&_controller->session(),
+				u"panel_insert"_q,
+				peer,
+				0,
+				text);
 			InsertIntoChat(_controller, peer, { text, {} });
 		}
+	} else if (event == u"operator"_q) {
+		JournalSetOperator(
+			&_controller->session(),
+			object.value(u"name"_q).toString());
 	}
 }
 

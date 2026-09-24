@@ -18,6 +18,10 @@ namespace Telegator {
 //   "panel": {
 //     "accounts": [ 123456789 ],        // Telegram user ids with the panel
 //     "url": "https://example.com/panel" // empty or missing: no page
+//   },
+//   "journal": {
+//     "url": "https://example.com/journal", // empty or missing: local only
+//     "key": "..."                          // sent as a bearer token
 //   }
 // }
 struct PanelConfig {
@@ -25,7 +29,13 @@ struct PanelConfig {
 	QString url;
 };
 
+struct JournalConfig {
+	QString url;
+	QByteArray key;
+};
+
 [[nodiscard]] const PanelConfig &Panel();
+[[nodiscard]] const JournalConfig &Journal();
 [[nodiscard]] bool PanelAllowed(not_null<Main::Session*> session);
 
 } // namespace Telegator
