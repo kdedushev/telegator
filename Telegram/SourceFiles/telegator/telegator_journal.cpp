@@ -103,7 +103,12 @@ struct Device {
 	if (!peer) {
 		return result;
 	}
-	result.insert(u"id"_q, QString::number(peer->id.value));
+	const auto bare = peer->isUser()
+		? peerToUser(peer->id).bare
+		: peer->isChat()
+		? peerToChat(peer->id).bare
+		: peerToChannel(peer->id).bare;
+	result.insert(u"id"_q, QString::number(bare));
 	result.insert(u"type"_q, ChatType(peer));
 	result.insert(u"name"_q, peer->name());
 	result.insert(u"username"_q, peer->username());
@@ -141,11 +146,12 @@ private:
 	[[nodiscard]] Cursor readCursor() const;
 	void saveCursor(const Cursor &cursor);
 	void upload();
-	void uploaded(const Cursor &next);
+	void uploaded(Cursor next);
 
 	base::Timer _timer;
 	std::unique_ptr<QNetworkAccessManager> _network;
 	base::flat_map<uint64, QString> _operators;
+	QString _rotatedWhileSending;
 	bool _sending = false;
 
 };
@@ -202,6 +208,9 @@ void Store::rotate() {
 	if (cursor.file == kCurrentName) {
 		cursor.file = name;
 		saveCursor(cursor);
+	}
+	if (_sending && _rotatedWhileSending.isEmpty()) {
+		_rotatedWhileSending = name;
 	}
 	dropOld();
 }
@@ -321,11 +330,20 @@ void Store::upload() {
 	QObject::connect(reply, &QNetworkReply::finished, [=] {
 		reply->deleteLater();
 		_sending = false;
+		const auto guard = gsl::finally([&] {
+			_rotatedWhileSending = QString();
+		});
 		const auto status = reply->attribute(
 			QNetworkRequest::HttpStatusCodeAttribute).toInt();
 		if (reply->error() == QNetworkReply::NoError
 			&& status >= 200
 			&& status < 300) {
+			uploaded(next);
+		} else if (status == 400 || status == 413) {
+			// WHY: the server will refuse this batch every time, waiting
+			// would stop the whole queue of this computer.
+			LOG(("Telegator: journal batch refused, status %1, skipped"
+				).arg(status));
 			uploaded(next);
 		} else {
 			LOG(("Telegator: journal upload failed, status %1, %2"
@@ -336,7 +354,10 @@ void Store::upload() {
 	});
 }
 
-void Store::uploaded(const Cursor &next) {
+void Store::uploaded(Cursor next) {
+	if (next.file == kCurrentName && !_rotatedWhileSending.isEmpty()) {
+		next.file = _rotatedWhileSending;
+	}
 	saveCursor(next);
 	_timer.callOnce(0);
 }
