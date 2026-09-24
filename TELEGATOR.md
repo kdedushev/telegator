@@ -166,6 +166,17 @@ nice -n 10 cmake --build ../out --config Debug --target test_telegator_requisite
   `PyPattern()` переводятся в классы Python (сверено по всем символам
   Unicode 15.1, как у Python 3.13 модуля).
 
+## Журнал действий
+
+`telegator_journal.*` (24.09.2026): кто, с какого компьютера отправил, правил,
+удалил, переслал, закрепил, поставил реакцию, нажал кнопку бота или пункт
+панели. Все запросы к Telegram проходят через `MTP::Instance::sendRequest`
+(метка `// Telegator`), удаление — через `Histories::deleteMessages`.
+Локально — `<папка данных>/telegator_journal/*.jsonl`; на сервер — если в
+`telegator.json` есть `"journal": {"url", "key"}`, пачками, недоставленное
+ждёт в тех же файлах. Страница панели сообщает, кто вошёл:
+`Telegator.setOperator(имя)`. Устройство — `telegator_device.json`.
+
 ## Гигиена — чтобы не копился мусор
 
 - **Сборка — в постоянном worktree `~/Projects/telegator-wt/dev`**: в нём `out/`
