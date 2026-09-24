@@ -512,6 +512,24 @@ void BotButton(
 	Write(session, u"bot_button"_q, peer, msgId, button, details);
 }
 
+// Bot's own start and mini app openings: the bot and where it was opened.
+void WebApp(
+		not_null<Main::Session*> session,
+		const QString &action,
+		PeerData *peer,
+		const MTPInputUser &input,
+		const QString &param) {
+	auto details = QJsonObject();
+	if (const auto bot = Data::UserFromInputMTP(&session->data(), input)) {
+		details.insert(u"bot_id"_q, QString::number(bot->id.value));
+		details.insert(u"bot_username"_q, bot->username());
+	}
+	if (!param.isEmpty()) {
+		details.insert(u"param"_q, Short(param));
+	}
+	Write(session, action, peer, 0, {}, details);
+}
+
 void Parse(
 		not_null<Main::Session*> session,
 		const SerializedRequest &request) {
@@ -652,6 +670,58 @@ void Parse(
 			Write(session, u"unpin_all"_q, Peer(session, peer), 0, {}, {});
 		}
 	} break;
+	case mtpc_messages_startBot: {
+		const auto bot = reader.read<MTPInputUser>();
+		const auto peer = reader.read<MTPInputPeer>();
+		(void)reader.read<MTPlong>();
+		const auto param = reader.read<MTPstring>();
+		if (reader.ok()) {
+			WebApp(session, u"bot_start"_q, Peer(session, peer), bot, qs(param));
+		}
+	} break;
+	case mtpc_messages_requestWebView: {
+		const auto flags = reader.flags();
+		const auto peer = reader.read<MTPInputPeer>();
+		const auto bot = reader.read<MTPInputUser>();
+		const auto url = (flags & (1U << 1))
+			? qs(reader.read<MTPstring>())
+			: QString();
+		if (reader.ok()) {
+			WebApp(session, u"bot_webapp"_q, Peer(session, peer), bot, url);
+		}
+	} break;
+	case mtpc_messages_requestSimpleWebView: {
+		const auto flags = reader.flags();
+		const auto bot = reader.read<MTPInputUser>();
+		const auto url = (flags & (1U << 3))
+			? qs(reader.read<MTPstring>())
+			: QString();
+		if (reader.ok()) {
+			WebApp(session, u"bot_webapp"_q, nullptr, bot, url);
+		}
+	} break;
+	case mtpc_messages_requestMainWebView: {
+		(void)reader.flags();
+		const auto peer = reader.read<MTPInputPeer>();
+		const auto bot = reader.read<MTPInputUser>();
+		if (reader.ok()) {
+			WebApp(session, u"bot_webapp"_q, Peer(session, peer), bot, {});
+		}
+	} break;
+	case mtpc_messages_sendVote: {
+		const auto peer = reader.read<MTPInputPeer>();
+		const auto id = reader.integer();
+		const auto options = reader.read<MTPVector<MTPbytes>>();
+		if (reader.ok()) {
+			auto list = QJsonArray();
+			for (const auto &option : options.v) {
+				list.push_back(BytesText(option.v));
+			}
+			auto details = QJsonObject();
+			details.insert(u"options"_q, list);
+			Write(session, u"vote"_q, Peer(session, peer), id, {}, details);
+		}
+	} break;
 	case mtpc_messages_getBotCallbackAnswer: {
 		const auto flags = reader.flags();
 		const auto peer = reader.read<MTPInputPeer>();
@@ -680,6 +750,11 @@ void Parse(
 	case mtpc_messages_updatePinnedMessage:
 	case mtpc_messages_unpinAllMessages:
 	case mtpc_messages_getBotCallbackAnswer:
+	case mtpc_messages_startBot:
+	case mtpc_messages_requestWebView:
+	case mtpc_messages_requestSimpleWebView:
+	case mtpc_messages_requestMainWebView:
+	case mtpc_messages_sendVote:
 		return true;
 	}
 	return false;
