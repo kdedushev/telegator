@@ -117,7 +117,9 @@ tools/telegator/install_mac.sh
 накопилось несколько).
 
 Агенту для проверки своей правки — Debug из `out/Debug` (закрыв установленный),
-после проверки обязательно вернуть владельцу его копию:
+после проверки обязательно вернуть владельцу его копию; `--restore` удаляет
+`out/Debug/Telegator.app`, чтобы в поиске Spotlight не было второго Telegator
+(следующая Debug-сборка создаёт его заново):
 
 ```bash
 open -n ~/Projects/telegator-wt/dev/out/Debug/Telegator.app

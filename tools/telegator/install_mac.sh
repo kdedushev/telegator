@@ -4,8 +4,9 @@
 #   tools/telegator/install_mac.sh            # move out/Release/Telegator.app into /Applications
 #   tools/telegator/install_mac.sh --restore  # after an agent ran a Debug build: back to the installed one
 #
-# The build is moved, not copied, so no second "Telegator" stays in out/ for
-# Spotlight and "Open With". Build bundles under the home folder are removed
+# The build is moved, not copied, and the agents' Debug bundle is removed
+# (the next Debug build recreates it in minutes), so Spotlight and "Open With"
+# show one Telegator. Build bundles under the home folder are removed
 # from Launch Services. Login data lives in ~/Library/Application Support/Telegator
 # and is shared by every build, so replacing the app keeps the session.
 set -euo pipefail
@@ -41,8 +42,13 @@ forget_builds() {
 		done
 }
 
+drop_debug() {
+	rm -rf "$DEV/out/Debug/Telegator.app"
+}
+
 if [ "${1:-}" = "--restore" ]; then
 	quit_all
+	drop_debug
 	forget_builds
 	open "$DEST"
 	exit 0
@@ -54,6 +60,7 @@ rm -rf "$DEST.old"
 [ -d "$DEST" ] && mv "$DEST" "$DEST.old"
 mv "$SRC" "$DEST"
 rm -rf "$DEST.old"
+drop_debug
 forget_builds
 "$LSREGISTER" -f "$DEST"
 open "$DEST"
