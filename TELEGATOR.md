@@ -51,8 +51,10 @@ cd ~/Projects/telegator-wt/dev && ./Telegram/build/prepare/mac.sh skip-release s
   Не запускай его из `~/Projects/telegator`: библиотеки лягут в `~/Projects`.
 - Xcode 27 собирает только под macOS 12.0 и новее: в `prepare.py` версия
   поднята до 12.0 (метка `# Telegator`), клиенту — `CMAKE_OSX_DEPLOYMENT_TARGET`.
-- Библиотеки собраны в Debug (`skip-release`), поэтому и клиент Debug. Для
-  раздачи сотрудникам — пересобрать библиотеки без `skip-release`.
+- С 25.09.2026 библиотеки собраны без `skip-release` — есть и Debug, и
+  Release (`mac.sh silent`). Debug — для разработки агентами (быстрее
+  пересборка); владельцу и сотрудникам — только Release: Debug без
+  оптимизации заметно дёргает меню и настройки.
 
 **Клиент** (первый раз ~40 минут, дальше — только изменённое):
 
@@ -62,6 +64,10 @@ set -a; . ~/Projects/telegator-wt/telegram_api.env; set +a
 ./configure.sh -D CMAKE_CONFIGURATION_TYPES=Debug -D CMAKE_COMPILE_WARNING_AS_ERROR=OFF -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON -D CMAKE_OSX_DEPLOYMENT_TARGET=12.0 -D CMAKE_CXX_FLAGS=-DMETA_NO_STD_FORWARD_DECLARATIONS -D TDESKTOP_API_ID="$TDESKTOP_API_ID" -D TDESKTOP_API_HASH="$TDESKTOP_API_HASH"
 nice -n 10 cmake --build ../out --config Debug --parallel 4
 ```
+
+Release для владельца: в configure — `-D "CMAKE_CONFIGURATION_TYPES=Debug;Release"`,
+сборка — `--config Release`, результат — `out/Release/Telegator.app`
+(Apple Silicon и Intel, `-O3`).
 
 - `--parallel 4` и `nice`: на Mac владельца 16 ГБ памяти, без ограничения
   Xcode запускает ~20 компиляторов, Mac уходит в подкачку и зависает.
