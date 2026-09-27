@@ -5,6 +5,11 @@ description: Process the local ignored ai-tdesktop inbox into durable, independe
 
 # Process Inbox
 
+In the Telegator fork, use this skill only when the owner explicitly asks to
+route the upstream `ai-tdesktop` inbox. Ordinary Telegator requests use
+`TELEGATOR.md` and its ROADMAP/direct workflow; do not require or create an
+upstream inbox or sibling queue implicitly.
+
 When running in Grok Build, read `.grok/ai-workflow-adapter.md` completely
 before any other host-specific delegation rule and apply its substitutions.
 

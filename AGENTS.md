@@ -2,6 +2,20 @@
 
 This guide defines repository-wide instructions for coding agents working with the Telegram Desktop codebase.
 
+## Telegator fork routing
+
+When this checkout is the Telegator fork (identified by its `TELEGATOR.md`),
+ordinary owner requests are Telegator work: use `docs/telegator/ROADMAP.md`
+and the direct task workflow described there and in `TELEGATOR.md`. Do not look
+for a missing `ai-tdesktop` sibling, select its queue, or require its review
+pipeline for that work. The queue and `perform-task` workflow below remain
+available only when the owner explicitly names an existing upstream
+`ai-tdesktop` task (or explicitly asks to run that upstream workflow against
+this checkout); then preserve its task records, safety checks, and review
+requirements. Focus checks and review on the actual Telegator change and its
+risk; money, access, concurrency, build, platform, and install safety rules
+still apply.
+
 ## AI Tasks
 
 In this repository "task" is a specific term. It always means one work record in

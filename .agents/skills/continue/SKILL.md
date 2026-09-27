@@ -5,6 +5,11 @@ description: Continue autonomous Telegram Desktop development from the shared ai
 
 # Continue AI Work
 
+In the Telegator fork, run this skill only for an explicitly selected upstream
+`ai-tdesktop` task or an explicit request for the upstream queue workflow.
+Ordinary Telegator requests use `TELEGATOR.md` and its ROADMAP/direct workflow;
+do not bootstrap a missing sibling queue for them.
+
 When running in Grok Build, read `.grok/ai-workflow-adapter.md` completely
 before any other host-specific delegation rule and apply its substitutions.
 

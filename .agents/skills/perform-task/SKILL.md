@@ -5,6 +5,11 @@ description: Resolve, start or resume, implement, review, test, and publish exac
 
 # Perform One AI Task
 
+In the Telegator fork, this workflow is reserved for an explicitly named
+upstream `ai-tdesktop` task or an explicit request to run the upstream task
+pipeline. Ordinary Telegator work follows `TELEGATOR.md` and its ROADMAP/direct
+workflow; do not require a missing sibling or select its queue implicitly.
+
 When running in Grok Build, read `.grok/ai-workflow-adapter.md` completely
 before any other host-specific delegation rule and apply its substitutions.
 
