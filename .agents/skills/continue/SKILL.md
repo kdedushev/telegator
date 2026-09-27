@@ -1,6 +1,6 @@
 ---
 name: continue
-description: Continue autonomous Telegram Desktop development from the shared ai-tdesktop repository. Use when the user invokes $continue or /continue, asks Codex to keep working through the AI queue, or wants one command to resume the active task at the head of a frozen startup batch, drain matching queued work, or process the local inbox only when startup has no task work, while including and consolidating follow-ups discovered from the batch but deferring unrelated tasks added mid-run.
+description: In the Telegator fork, apply only to explicitly requested upstream ai-tdesktop work, never ordinary fork requests. Continue autonomous Telegram Desktop development from the shared ai-tdesktop repository. Use when the user invokes $continue or /continue, asks Codex to keep working through the AI queue, or wants one command to resume the active task at the head of a frozen startup batch, drain matching queued work, or process the local inbox only when startup has no task work, while including and consolidating follow-ups discovered from the batch but deferring unrelated tasks added mid-run.
 ---
 
 # Continue AI Work

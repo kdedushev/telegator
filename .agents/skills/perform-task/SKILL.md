@@ -1,6 +1,6 @@
 ---
 name: perform-task
-description: Resolve, start or resume, implement, review, test, and publish exactly one existing ai-tdesktop task by short slug or full dated id, including rare blocked retries and split-required results. Use when the user invokes $perform-task or /perform-task with a known task name, or when the continue scheduler delegates one selected task. Runs standard review lenses with fast applicability bailouts and selects task-specific domain and evidence instruments without selecting additional work.
+description: In the Telegator fork, apply only to explicitly requested upstream ai-tdesktop work, never ordinary fork requests. Resolve, start or resume, implement, review, test, and publish exactly one existing ai-tdesktop task by short slug or full dated id, including rare blocked retries and split-required results. Use when the user invokes $perform-task or /perform-task with a known task name, or when the continue scheduler delegates one selected task. Runs standard review lenses with fast applicability bailouts and selects task-specific domain and evidence instruments without selecting additional work.
 ---
 
 # Perform One AI Task
