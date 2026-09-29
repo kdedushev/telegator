@@ -50,8 +50,7 @@ namespace {
 
 TelegatorPreviewSource *Source = nil;
 
-// Quick Look asks the responder chain who controls the panel; the
-// application object is the end of every chain, whatever window is key.
+// Quick Look asks the responder chain who controls the panel.
 BOOL AcceptsPanel(id self, SEL _cmd, QLPreviewPanel *panel) {
 	return Source != nil;
 }
@@ -61,35 +60,39 @@ void BeginPanel(id self, SEL _cmd, QLPreviewPanel *panel) {
 	panel.delegate = Source;
 }
 
+// Control moves between the chains as windows become key, the file
+// stays: Source lives until the next file replaces it.
 void EndPanel(id self, SEL _cmd, QLPreviewPanel *panel) {
-	panel.dataSource = nil;
-	panel.delegate = nil;
 }
 
-bool BecomePanelController() {
-	static const auto result = [] {
-		const auto app = object_getClass(NSApp);
-		if (!app) {
-			return false;
-		}
-		class_addMethod(
-			app,
-			@selector(acceptsPreviewPanelControl:),
-			(IMP)AcceptsPanel,
-			"c@:@");
-		class_addMethod(
-			app,
-			@selector(beginPreviewPanelControl:),
-			(IMP)BeginPanel,
-			"v@:@");
-		class_addMethod(
-			app,
-			@selector(endPreviewPanelControl:),
-			(IMP)EndPanel,
-			"v@:@");
-		return true;
-	}();
-	return result;
+void AddControl(Class type) {
+	if (!type) {
+		return;
+	}
+	class_addMethod(
+		type,
+		@selector(acceptsPreviewPanelControl:),
+		(IMP)AcceptsPanel,
+		"c@:@");
+	class_addMethod(
+		type,
+		@selector(beginPreviewPanelControl:),
+		(IMP)BeginPanel,
+		"v@:@");
+	class_addMethod(
+		type,
+		@selector(endPreviewPanelControl:),
+		(IMP)EndPanel,
+		"v@:@");
+}
+
+// The key window and the application are in every responder chain
+// Quick Look walks; class_addMethod keeps methods a class already has.
+void BecomePanelController() {
+	AddControl(object_getClass(NSApp));
+	if (const auto window = [NSApp keyWindow]) {
+		AddControl(object_getClass(window));
+	}
 }
 
 } // namespace
@@ -97,8 +100,7 @@ bool BecomePanelController() {
 bool PreviewFile(const QString &path) {
 	// Programs keep Telegram's warning before they are launched.
 	if (path.isEmpty()
-		|| Core::DetectNameType(path) == Core::NameType::Executable
-		|| !BecomePanelController()) {
+		|| Core::DetectNameType(path) == Core::NameType::Executable) {
 		return false;
 	}
 	@autoreleasepool {
@@ -107,6 +109,7 @@ bool PreviewFile(const QString &path) {
 	if (!url) {
 		return false;
 	}
+	BecomePanelController();
 	auto panel = [QLPreviewPanel sharedPreviewPanel];
 	if (!panel) {
 		return false;
@@ -115,12 +118,11 @@ bool PreviewFile(const QString &path) {
 	// one only after the panel is switched to the new one.
 	const auto previous = Source;
 	Source = [[TelegatorPreviewSource alloc] initWithURL:url];
-	if ([panel isVisible]) {
-		panel.dataSource = Source;
-		panel.delegate = Source;
-		[panel reloadData];
-	}
 	[panel makeKeyAndOrderFront:nil];
+	// Set directly as well: without a controller found in the chain
+	// the panel shows "No items selected".
+	panel.dataSource = Source;
+	panel.delegate = Source;
 	[panel reloadData];
 	[previous release];
 	return true;
