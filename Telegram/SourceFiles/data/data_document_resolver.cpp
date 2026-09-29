@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "media/player/media_player_instance.h"
 #include "platform/platform_file_utilities.h"
+#include "telegator/telegator_file_preview.h" // Telegator
 #include "ui/boxes/confirm_box.h"
 #include "ui/chat/chat_theme.h"
 #include "ui/text/text_utilities.h"
@@ -295,7 +296,8 @@ void ResolveDocument(
 				}
 				context = QVariant::fromValue(clickHandlerContext);
 			}
-			if (!Core::App().iv().showMarkdown(path, context)) {
+			if (!Core::App().iv().showMarkdown(path, context)
+				&& !Telegator::PreviewFile(path)) { // Telegator
 				LaunchWithWarning(path, item);
 			}
 		} else if (document->status == FileReady

@@ -8,6 +8,9 @@ PRIVATE
     telegator/telegator_config.h
     telegator/telegator_field.cpp
     telegator/telegator_field.h
+    telegator/telegator_file_preview.cpp
+    telegator/telegator_file_preview.h
+    telegator/telegator_file_preview_mac.mm
     telegator/telegator_id_search.cpp
     telegator/telegator_id_search.h
     telegator/telegator_journal.cpp
@@ -24,6 +27,11 @@ PRIVATE
     telegator/telegator_requisites_format.cpp
     telegator/telegator_requisites_format.h
 )
+
+if (APPLE)
+    # Quick Look panel for documents: telegator_file_preview_mac.mm.
+    target_link_frameworks(Telegram PRIVATE Quartz)
+endif()
 
 # Built-in "Реквизиты" against their reference vectors: see TELEGATOR.md.
 add_executable(test_telegator_requisites)
