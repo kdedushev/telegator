@@ -583,9 +583,14 @@ int SidePanel::layout(int left, int top, int right, int bottom) {
 	}
 	const auto area = QRect(left, top, right - left, bottom - top);
 	_maxWidth = area.width() - st::columnMinimalWidthMain;
-	const auto width = std::min(_width, _maxWidth);
-	if (!Shown(_controller).current()
-		|| width < style::ConvertScale(kPanelMinWidth)) {
+	// fitDialogs() makes room; in a very narrow window the chat gets
+	// narrower than usual rather than the panel disappearing.
+	const auto width = std::min(
+		std::max(
+			std::min(_width, _maxWidth),
+			style::ConvertScale(kPanelMinWidth)),
+		area.width() - st::columnMinimalWidthMain / 2);
+	if (!Shown(_controller).current() || width <= 0) {
 		_body->hide();
 		return 0;
 	}
@@ -605,6 +610,26 @@ int SidePanel::layout(int left, int top, int right, int bottom) {
 	}
 	_body->show();
 	return width;
+}
+
+int SidePanel::fitDialogs(int dialogsWidth, int bodyWidth) const {
+	if (!_allowed || !Shown(_controller).current()) {
+		return dialogsWidth;
+	}
+	const auto min = style::ConvertScale(kPanelMinWidth);
+	const auto chat = st::columnMinimalWidthMain;
+	if (bodyWidth - dialogsWidth - chat >= min) {
+		return dialogsWidth;
+	}
+	// The full chats list while the panel fits at its own width, then at
+	// its minimal width, else the list of photos only, as Telegram does.
+	const auto full = bodyWidth - chat - std::max(_width, min);
+	if (full >= st::columnMinimalWidthLeft) {
+		return std::min(dialogsWidth, full);
+	} else if (bodyWidth - chat - min >= st::columnMinimalWidthLeft) {
+		return std::min(dialogsWidth, int(st::columnMinimalWidthLeft));
+	}
+	return std::min(dialogsWidth, _controller->dialogsSmallColumnWidth());
 }
 
 void SidePanel::setupResize() {

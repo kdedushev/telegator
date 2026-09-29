@@ -2763,6 +2763,7 @@ void MainWidget::updateControlsGeometry() {
 			accumulate_min(
 				dialogsWidth,
 				width() - st::columnMinimalWidthMain);
+			dialogsWidth = _telegatorPanel->fitDialogs(dialogsWidth, width() - thirdSectionWidth); // Telegator
 			_dialogs->setGeometryToLeft(0, 0, dialogsWidth, height());
 		}
 		thirdSectionWidth += _telegatorPanel->layout(dialogsWidth, getThirdSectionTop(), width() - thirdSectionWidth, height()); // Telegator

@@ -87,6 +87,10 @@ public:
 	// returns the taken width.
 	[[nodiscard]] int layout(int left, int top, int right, int bottom);
 
+	// Narrows the chats list when the shown panel has no room, so that
+	// the panel is never hidden, returns the chats list width.
+	[[nodiscard]] int fitDialogs(int dialogsWidth, int bodyWidth) const;
+
 	[[nodiscard]] not_null<HistoryWidget*> history() const;
 
 	void chooseMenu(QByteArray event);
