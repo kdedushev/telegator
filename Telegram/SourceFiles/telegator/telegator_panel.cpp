@@ -539,8 +539,16 @@ SidePanel::SidePanel(
 				createWebview();
 			}
 		}
+		SaveState(u"panel_shown"_q, shown);
 		_relayout();
 	}, _body->lifetime());
+
+	// Shown as it was left: the main widget is still being constructed.
+	if (State().value(u"panel_shown"_q).toBool()) {
+		crl::on_main(_body.get(), [=] {
+			Shown(controller) = true;
+		});
+	}
 
 	controller->activeChatValue(
 	) | rpl::on_next([=] {
