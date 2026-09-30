@@ -148,6 +148,23 @@ tools/telegator/install_mac.sh --restore
 
 Для ручной проверки сообщений — чат «Избранное», не живые собеседники.
 
+## Раздача сотрудникам (macOS)
+
+Собрать Release (раздел «Сборка»), затем
+
+```bash
+tools/telegator/package_mac.sh
+```
+
+Результат — `~/Projects/telegator-wt/dist/Telegator-<версия>-<коммит>.dmg`:
+окно «перетащите в Программы» с подсказкой первого запуска. В пакет кладётся
+`~/Projects/telegator-wt/package.json` (вне git, только раздел `panel`) —
+`Contents/Resources/telegator.json`; свой `telegator.json` в папке данных
+его перекрывает. Ключ журнала в пакет не кладётся: он у каждого компьютера
+свой. Подпись — ad hoc (macOS один раз просит «Всё равно открыть»);
+`TELEGATOR_SIGN_IDENTITY` — подпись сертификатом Developer ID. Сотрудник
+входит в панель своим логином админки — `tk admin add-staff` меты.
+
 ## Обновление с Telegram
 
 ```bash
