@@ -13,7 +13,9 @@ class Session;
 namespace Telegator {
 
 // Local settings of this installation, never stored in the repository.
-// Read once from <working dir>/telegator.json:
+// Read once from <working dir>/telegator.json; without "panel" there, the
+// panel comes from telegator.json packaged with the program (the app
+// bundle's Resources on macOS, the program folder elsewhere):
 // {
 //   "panel": {
 //     "accounts": [ 123456789 ],        // Telegram user ids with the panel
