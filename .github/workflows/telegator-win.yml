@@ -1,0 +1,173 @@
+name: Telegator Windows
+
+# Release-сборка Windows x64 и установщик Telegator-setup.exe (tools/telegator/win).
+# Настройки панели (секрет TELEGATOR_PANEL_CONFIG) кладутся в установщик, поэтому
+# артефакт — архив 7z под паролем TELEGATOR_ARTIFACT_KEY: репозиторий публичный.
+# Библиотеки (Debug и Release) собираются часами: шаг прерывается до лимита задания,
+# собранное сохраняется в кеш, следующий запуск продолжает с него.
+
+on:
+  workflow_dispatch:
+    inputs:
+      only_cache:
+        description: 'Собрать только библиотеки и положить в кеш'
+        type: boolean
+        default: false
+
+jobs:
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    env:
+      ONLY_CACHE: ${{ inputs.only_cache && 'true' || 'false' }}
+      PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+      - name: Prepare directories.
+        run: |
+          mkdir %userprofile%\TBuild\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
+          echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64>>%GITHUB_ENV%
+
+      - name: Get repository name.
+        shell: bash
+        run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - name: Clone.
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+
+      - name: First set up.
+        shell: bash
+        run: |
+          DOCPATH=$TBUILD/$REPO_NAME/docs/building-win.md
+          SDK="$(grep "SDK version" $DOCPATH | sed -r 's/.*\*\*(.*)\*\* SDK version.*/\1/')"
+          echo "SDK=$SDK" >> $GITHUB_ENV
+
+          echo "$(sha256sum $TBUILD/$REPO_NAME/$PREPARE_PATH | awk '{ print $1 }')" >> CACHE_KEY.txt
+          echo "$SDK" >> CACHE_KEY.txt
+          echo "CACHE_KEY=$(sha256sum CACHE_KEY.txt | awk '{ print $1 }')" >> $GITHUB_ENV
+
+          git config --global user.email "you@example.com"
+          git config --global user.name "Sample"
+
+      - uses: Eden-CI/msvc-dev-cmd@master
+        name: Native Tools Command Prompt.
+        with:
+          arch: x64
+          sdk: ${{ env.SDK }}
+          toolset: '14.44'
+
+      - name: NuGet sources.
+        run: |
+          nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
+          nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
+
+      - name: Libraries cache.
+        id: cache-libs
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ${{ env.TBUILD }}\ThirdParty
+            ${{ env.LibrariesPath }}
+          key: telegator-win64-qt6-release-${{ env.CACHE_KEY }}-${{ github.run_id }}
+          restore-keys: telegator-win64-qt6-release-${{ env.CACHE_KEY }}-
+
+      - name: Libraries.
+        id: libs
+        timeout-minutes: 300
+        continue-on-error: true
+        run: |
+          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent qt6
+
+      - name: Free up some disk space.
+        shell: bash
+        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.dll' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
+
+      - name: Save libraries.
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ env.TBUILD }}\ThirdParty
+            ${{ env.LibrariesPath }}
+          key: telegator-win64-qt6-release-${{ env.CACHE_KEY }}-${{ github.run_id }}
+
+      - name: Libraries unfinished.
+        if: steps.libs.outcome != 'success'
+        run: |
+          echo Libraries are not finished yet: run the workflow again, it continues from the cache.
+          exit 1
+
+      - name: API credentials.
+        if: env.ONLY_CACHE == 'false'
+        shell: bash
+        env:
+          API_ID: ${{ secrets.TDESKTOP_API_ID }}
+          API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+        run: |
+          if [ -n "$API_ID" ] && [ -n "$API_HASH" ]; then
+            echo "API_DEFINES=-D TDESKTOP_API_ID=$API_ID -D TDESKTOP_API_HASH=$API_HASH" >> $GITHUB_ENV
+          else
+            echo "API_DEFINES=-D TDESKTOP_API_TEST=ON" >> $GITHUB_ENV
+            echo "WARNING: using Telegram test credentials, login will be limited."
+          fi
+
+      - name: Telegator build.
+        if: env.ONLY_CACHE == 'false'
+        run: |
+          cd %TBUILD%\%REPO_NAME%\Telegram
+
+          call configure.bat ^
+          x64 ^
+          qt6 ^
+          %API_DEFINES% ^
+          -D CMAKE_CONFIGURATION_TYPES=Release ^
+          -D CMAKE_COMPILE_WARNING_AS_ERROR=OFF ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+
+          cmake --build ..\out --config Release --parallel
+
+      - name: Installer.
+        if: env.ONLY_CACHE == 'false'
+        shell: bash
+        env:
+          PANEL_CONFIG: ${{ secrets.TELEGATOR_PANEL_CONFIG }}
+          ARTIFACT_KEY: ${{ secrets.TELEGATOR_ARTIFACT_KEY }}
+        run: |
+          set -e
+          [ -n "$PANEL_CONFIG" ] && [ -n "$ARTIFACT_KEY" ] || { echo "Нет секретов TELEGATOR_PANEL_CONFIG / TELEGATOR_ARTIFACT_KEY"; exit 1; }
+          ROOT="$TBUILD/$REPO_NAME"
+          OUT="$ROOT/out/Release"
+          printf '%s' "$PANEL_CONFIG" > "$OUT/telegator.json"
+          VERSION=$(grep -oE 'AppVersionStr = "[0-9.]+"' "$ROOT/Telegram/SourceFiles/core/version.h" | grep -oE '[0-9.]+')
+          mkdir -p "$GITHUB_WORKSPACE/installer"
+          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" \
+            "-DMyAppVersion=$VERSION" \
+            "-DReleasePath=$(cygpath -w "$OUT")" \
+            "-DOutputPath=$(cygpath -w "$GITHUB_WORKSPACE/installer")" \
+            "$(cygpath -w "$ROOT/tools/telegator/win/telegator.iss")"
+          rm -f "$OUT/telegator.json"
+          cd "$GITHUB_WORKSPACE/installer"
+          7z a -t7z -mhe=on "-p$ARTIFACT_KEY" Telegator-windows.7z Telegator-setup.exe > /dev/null
+          rm Telegator-setup.exe
+          ls -la
+
+      - uses: actions/upload-artifact@v7
+        if: env.ONLY_CACHE == 'false'
+        name: Upload artifact.
+        with:
+          name: Telegator-windows
+          path: installer\Telegator-windows.7z
+          retention-days: 14
