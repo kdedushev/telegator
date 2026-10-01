@@ -161,6 +161,11 @@ jobs:
       - name: Telegator build.
         if: env.ONLY_CACHE == 'false'
         run: |
+          rem /MP без числа = cl.exe на каждое ядро, MSBuild-овский CL_MPCount его не ограничивает;
+          rem в Release с PCH каждый ест 3-5 ГБ, на 16 ГБ раннера — C1060. Два процесса.
+          powershell -Command "(Get-Content %TBUILD%\%REPO_NAME%\cmake\options_win.cmake) -replace '/MP ', '/MP2 ' | Set-Content %TBUILD%\%REPO_NAME%\cmake\options_win.cmake"
+          findstr /C:"/MP2" %TBUILD%\%REPO_NAME%\cmake\options_win.cmake || exit 1
+
           cd %TBUILD%\%REPO_NAME%\Telegram
 
           call configure.bat ^
@@ -172,8 +177,7 @@ jobs:
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
-          rem 01.10.2026: при --parallel без предела cl.exe упирался в память (C1060).
-          cmake --build ..\out --config Release --parallel 2 -- /p:CL_MPCount=2
+          cmake --build ..\out --config Release --parallel 1
 
       - name: Installer.
         if: env.ONLY_CACHE == 'false'
