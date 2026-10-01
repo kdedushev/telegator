@@ -51,6 +51,14 @@ jobs:
           "TBUILD=$env:GITHUB_WORKSPACE\TBuild" >> $env:GITHUB_ENV
           "LibrariesPath=$env:GITHUB_WORKSPACE\TBuild\Libraries\win64" >> $env:GITHUB_ENV
 
+      # Компилятор упирался в память и при двух процессах (C1060): файл подкачки 32 ГБ.
+      - name: Page file.
+        uses: al-cheb/configure-pagefile-action@v1.4
+        with:
+          minimum-size: 16GB
+          maximum-size: 32GB
+          disk-root: "D:"
+
       - name: Get repository name.
         shell: bash
         run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
