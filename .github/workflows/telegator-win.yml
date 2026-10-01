@@ -30,12 +30,26 @@ jobs:
         shell: cmd
 
     steps:
-      - name: Prepare directories.
+      # Qt с Debug и Release не помещался на C: (01.10.2026: «Cannot write precompiled
+      # header»): убираем ненужное образу и строим на диске, где свободнее.
+      - name: Free disk space.
+        shell: pwsh
         run: |
-          mkdir %userprofile%\TBuild\Libraries
-          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
-          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
-          echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64>>%GITHUB_ENV%
+          foreach ($dir in 'C:\Android', 'C:\ghcup', 'C:\Program Files (x86)\Android', 'C:\Program Files\Android', 'C:\Strawberry', 'C:\rtools45', 'C:\tools\php') {
+            if (Test-Path $dir) { cmd /c "rmdir /s /q `"$dir`"" }
+          }
+          Get-PSDrive -PSProvider FileSystem | Format-Table Name, @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}
+
+      - name: Prepare directories.
+        shell: pwsh
+        run: |
+          $drive = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name -in 'C','D' -and $_.Free } | Sort-Object Free -Descending | Select-Object -First 1
+          $root = if ($drive.Name -eq 'C') { "$env:USERPROFILE\TBuild" } else { "$($drive.Name):\TBuild" }
+          Write-Output "Build root: $root ($([math]::Round($drive.Free/1GB,1)) GB free)"
+          New-Item -ItemType Directory -Force "$root\Libraries" | Out-Null
+          cmd /c mklink /d "$env:GITHUB_WORKSPACE\TBuild" "$root"
+          "TBUILD=$env:GITHUB_WORKSPACE\TBuild" >> $env:GITHUB_ENV
+          "LibrariesPath=$env:GITHUB_WORKSPACE\TBuild\Libraries\win64" >> $env:GITHUB_ENV
 
       - name: Get repository name.
         shell: bash
@@ -103,8 +117,9 @@ jobs:
           %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent qt6
 
       - name: Free up some disk space.
+        if: always()
         shell: bash
-        run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.dll' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
+        run: df -h /c /d 2>/dev/null; find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.dll' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
 
       - name: Save libraries.
         if: always()
