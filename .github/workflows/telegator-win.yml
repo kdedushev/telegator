@@ -164,7 +164,8 @@ jobs:
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
 
-          cmake --build ..\out --config Release --parallel
+          rem 01.10.2026: при --parallel без предела cl.exe упирался в память (C1060).
+          cmake --build ..\out --config Release --parallel 2 -- /p:CL_MPCount=2
 
       - name: Installer.
         if: env.ONLY_CACHE == 'false'
