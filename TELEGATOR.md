@@ -165,6 +165,18 @@ tools/telegator/package_mac.sh
 `TELEGATOR_SIGN_IDENTITY` — подпись сертификатом Developer ID. Сотрудник
 входит в панель своим логином админки — `tk admin add-staff` меты.
 
+## Раздача сотрудникам (Windows)
+
+Облако: `gh workflow run telegator-win.yml --repo kdedushev/telegator --ref main`
+(Actions → «Telegator Windows»), затем `tools/telegator/fetch_win.sh` —
+`~/Projects/telegator-wt/dist/Telegator-setup.exe`. Панель — секрет
+`TELEGATOR_PANEL_CONFIG`, ложится рядом с exe; артефакт — 7z под ключом
+`~/Projects/telegator-wt/artifact.key` (= секрет `TELEGATOR_ARTIFACT_KEY`).
+Библиотеки — в кеше Actions; недособранные — перезапуск продолжает.
+Бесплатный раннер — 16 ГБ: компилятор ограничен `/MP2` и подкачкой
+(без этого C1060). Сборка Telegator — ~2,5 ч. Первый запуск — SmartScreen
+«Подробнее → Выполнить в любом случае».
+
 ## Обновление с Telegram
 
 ```bash
