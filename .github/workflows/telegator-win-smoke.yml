@@ -1,0 +1,54 @@
+name: Telegator Windows smoke
+
+# Проверка установщика на чистой Windows до раздачи: тихая установка, запуск,
+# через минуту процесс жив, снимок экрана. Снимок — в 7z под тем же ключом.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Номер запуска "Telegator Windows" с артефактом'
+        required: true
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: Telegator-windows
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Install and run.
+        shell: pwsh
+        env:
+          ARTIFACT_KEY: ${{ secrets.TELEGATOR_ARTIFACT_KEY }}
+        run: |
+          7z x -y "-p$env:ARTIFACT_KEY" Telegator-windows.7z | Out-Null
+          $p = Start-Process .\Telegator-setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/LOG=setup.log' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content setup.log -Tail 30; exit 1 }
+          $app = "$env:APPDATA\Telegator"
+          Get-ChildItem $app | Format-Table Name, Length
+          foreach ($f in 'Telegator.exe','telegator.json') { if (!(Test-Path "$app\$f")) { "Нет $f"; exit 1 } }
+          $lnk = Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter 'Telegator.lnk'
+          if (!$lnk) { 'Нет ярлыка в меню Пуск'; exit 1 }
+          Start-Process "$app\Telegator.exe"
+          Start-Sleep 60
+          $proc = Get-Process Telegator -ErrorAction SilentlyContinue
+          if (!$proc) { 'Telegator закрылся в первую минуту'; Get-WinEvent -LogName Application -MaxEvents 10 | Format-List TimeCreated, Message; exit 1 }
+          "Telegator работает: $([math]::Round($proc.WorkingSet64/1MB)) МБ"
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$PWD\screen.png")
+          7z a -t7z -mhe=on "-p$env:ARTIFACT_KEY" smoke.7z screen.png setup.log | Out-Null
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: Telegator-windows-smoke
+          path: smoke.7z
+          retention-days: 3
